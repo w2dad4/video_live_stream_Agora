@@ -1,73 +1,70 @@
-import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import 'package:geolocator/geolocator.dart';
+// 假设这是你的数据模型路径
 import 'package:video_live_stream/live_stream_homePage/discover_page/discover_page.dart';
 
-//定义主播状态
-//获取用户定位
-//请求附近主播数据
-//按距离排序
-class AnchorProvider extends ChangeNotifier {
-  List<NearbyAnchor> _anchors = [];
-  bool _isLoading = false;
-  String? _error;
-  bool _isDispoer = false;
-  // ignore: unused_field
-  Position? _current;
+// --- 使用 Riverpod 定义状态模型 ---
+class AnchorState {
+  final List<NearbyAnchor> anchors;
+  final bool isLoading;
+  final String? error;
 
-  List<NearbyAnchor> get anchors => _anchors;
-  bool get isLoading => _isLoading;
-  String? get error => _error;
-  @override
-  void notifyListeners() {
-    if (!_isDispoer) {
-      super.notifyListeners();
-    }
-  }
+  AnchorState({this.anchors = const [], this.isLoading = false, this.error});
 
-  @override
-  void dispose() {
-    _isDispoer = true;
-    super.dispose();
-  }
-
-  //初始化获取定位和数据
-  Future<void> initData() async {
-    if (_isLoading) return;
-    _isLoading = true;
-    _error = null;
-    notifyListeners(); //通知显示加载圆圈
-    try {
-      _current = await permission();
-      // 1. 调用你之前的定位权限逻辑
-      // 2. 模拟网络请求
-
-      await Future.delayed(const Duration(seconds: 2));
-      // 模拟排序逻辑：根据距离从小到大排序
-      _anchors = List<NearbyAnchor>.from(VideoDiscoverPage.mockData);
-      _anchors.sort((a, b) => a.distance.compareTo(b.distance));
-    } catch (e) {
-      _error = e.toString();
-    } finally {
-      _isLoading = false;
-      notifyListeners(); //刷新ui展现界面
-    }
-    ;
+  AnchorState copyWith({List<NearbyAnchor>? anchors, bool? isLoading, String? error}) {
+    return AnchorState(anchors: anchors ?? this.anchors, isLoading: isLoading ?? this.isLoading, error: error ?? this.error);
   }
 }
 
-Future<Position> permission() async {
-  // 1. 检查定位服务是否开启
-  bool serviceEnable = await Geolocator.isLocationServiceEnabled();
-  if (!serviceEnable) return Future.error('定位未开启');
-  // 2. 检查并请求权限
-  LocationPermission perm = await Geolocator.checkPermission();
-  //判断权限是否开启
-  if (perm == LocationPermission.denied) {
-    perm = await Geolocator.requestPermission();
-    if (perm == LocationPermission.denied) {
-      return Future.error('权限未开启');
+// --- Riverpod 控制器 ---
+class AnchorNotifier extends StateNotifier<AnchorState> {
+  AnchorNotifier() : super(AnchorState());
+
+  Future<void> initData() async {
+    if (state.isLoading) return;
+    state = state.copyWith(isLoading: true, error: null);
+
+    try {
+      // 调用修复后的权限与定位逻辑
+      // final position = await getValidatedPosition();
+
+      // 模拟请求与排序逻辑
+      await Future.delayed(const Duration(seconds: 2));
+      var mockList = List<NearbyAnchor>.from(VideoDiscoverPage.mockData);
+      mockList.sort((a, b) => a.distance.compareTo(b.distance));
+      state = state.copyWith(anchors: mockList, isLoading: false);
+    } catch (e) {
+      state = state.copyWith(error: e.toString(), isLoading: false);
     }
   }
-  const LocationSettings Settings = LocationSettings(accuracy: LocationAccuracy.low, distanceFilter: 1000); //移动超过1000米才触发位置更新
-  return await Geolocator.getCurrentPosition(locationSettings: Settings);
+}
+
+// 定义全局 Provider
+final anchorProvider = StateNotifierProvider<AnchorNotifier, AnchorState>((ref) {
+  return AnchorNotifier();
+});
+
+// --- 修复后的定位函数 ---
+Future<Position> getValidatedPosition() async {
+  // 1. 检查定位服务
+  bool serviceEnable = await Geolocator.isLocationServiceEnabled();
+  if (!serviceEnable) return Future.error('定位服务未开启，请在设置中打开');
+
+  // 2. 权限校验
+  LocationPermission perm = await Geolocator.checkPermission();
+  if (perm == LocationPermission.denied) {
+    perm = await Geolocator.requestPermission();
+    if (perm == LocationPermission.denied) return Future.error('定位权限被拒绝');
+  }
+
+  if (perm == LocationPermission.deniedForever) return Future.error('定位权限被永久拒绝，请手动开启');
+
+  // 3. 核心修复点：适配 geolocator 12.0.0 的平铺参数写法
+  // 注意：getCurrentPosition 是单次获取，不支持 distanceFilter 参数
+  return await Geolocator.getCurrentPosition(
+    // ignore: deprecated_member_use
+    desiredAccuracy: LocationAccuracy.low, // 这里传枚举，不传对象
+    // ignore: deprecated_member_use
+    timeLimit: const Duration(seconds: 10), // 超时设置
+  );
 }

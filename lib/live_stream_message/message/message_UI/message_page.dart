@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -23,10 +25,15 @@ class MessagePage extends ConsumerWidget {
   Widget _buildMessageTile(ChatConversation item, BuildContext context) {
     return ListTile(
       //图片
-      leading: ClipRRect(
-        borderRadius: BorderRadius.circular(10), //
-        child: Image.network(item.avatar, width: 50, height: 50, fit: BoxFit.cover),
+      leading: SizedBox(
+        width: 50,
+        height: 50,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(10), //
+          child: _buildAvatar(item.avatar),
+        ),
       ),
+
       //标题
       title: Text(item.title, style: const TextStyle(fontSize: 15, color: Colors.black)),
       // 副标题：动态接收的最新消息内容
@@ -37,6 +44,34 @@ class MessagePage extends ConsumerWidget {
       onTap: () {
         context.pushNamed('chat', pathParameters: {'chatId': item.id.toString()});
       },
+    );
+  }
+
+  Widget _buildAvatar(String url) {
+    if (url.startsWith('http')) {
+      return Image.network(
+        url,
+        width: 50,
+        height: 50,
+        fit: BoxFit.cover,
+        errorBuilder: (_, error, stackTrace) => Image.asset('assets/image/002.png', fit: BoxFit.cover),
+      );
+    }
+    if (url.startsWith('/')) {
+      return Image.file(
+        File(url),
+        width: 50,
+        height: 50,
+        fit: BoxFit.cover,
+        errorBuilder: (_, error, stackTrace) => Image.asset('assets/image/002.png', fit: BoxFit.cover),
+      );
+    }
+    return Image.asset(
+      url.isEmpty ? 'assets/image/002.png' : url,
+      width: 50,
+      height: 50,
+      fit: BoxFit.cover,
+      errorBuilder: (_, error, stackTrace) => Image.asset('assets/image/002.png', fit: BoxFit.cover),
     );
   }
 }

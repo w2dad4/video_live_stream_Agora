@@ -101,7 +101,6 @@ class VideoCardState extends State<VideoCard> {
         _controller?.play();
       }
     } catch (e) {
-      debugPrint('暂未出现$e');
     }
   }
 

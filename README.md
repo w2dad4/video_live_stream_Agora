@@ -15,3 +15,10 @@ A few resources to get you started if this is your first Flutter project:
 For help getting started with Flutter development, view the
 [online documentation](https://docs.flutter.dev/), which offers tutorials,
 samples, guidance on mobile development, and a full API reference.
+
+
+项目名称：小猫快播 (Little Cat Live)
+
+核心功能：P2P 视频分发、附近主播发现、毛玻璃胶囊底栏。
+
+技术栈：Flutter, GoRouter, VideoPlayer...

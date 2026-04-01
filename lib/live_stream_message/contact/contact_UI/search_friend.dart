@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:video_live_stream/live_stream_message/contact/contact_Data.data/search_provider.dart';
+import 'package:video_live_stream/live_stream_message/contact/contact_Data/search_provider.dart';
 import 'package:video_live_stream/live_stream_message/contact/contact_UI/qr_flutter.dart';
 
 // 1. 定义一个用于存储搜索关键字的 Provider

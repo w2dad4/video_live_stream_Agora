@@ -38,7 +38,7 @@ class VideoMessagePageState extends State<VideoMessagePage> {
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05), //
+                  color: Colors.black.withValues(alpha: 0.1), //
                   blurRadius: 5,
                   spreadRadius: 1,
                 ),

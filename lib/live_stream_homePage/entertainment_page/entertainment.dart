@@ -29,7 +29,11 @@ class VideoEnterinmentPageState extends State<VideoEnterinmentPage> {
                   width: MediaQuery.of(context).size.width * 0.2,
                   height: 70,
                   decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), color: ColorState.color6),
-                  child: Image.network(item['image']!, fit: BoxFit.cover),
+                  child: Image.network(
+                    item['image']!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, error, stackTrace) => Image.asset('assets/image/002.png', fit: BoxFit.cover),
+                  ),
                 ),
               ),
               Expanded(
@@ -43,12 +47,7 @@ class VideoEnterinmentPageState extends State<VideoEnterinmentPage> {
                         style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.black),
                       ),
                       Divider(color: Colors.black, thickness: 0.5, height: 5),
-                      Text(
-                        item['desc']!,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: const Color.fromARGB(255, 99, 97, 97)),
-                      ),
+                      Text(item['desc']!, style: TextStyle(fontSize: 13)),
                     ],
                   ),
                 ),

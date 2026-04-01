@@ -35,13 +35,43 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   liquid_glass_widgets: ^0.3.0-dev.1
-  video_player: ^2.11.0
-  geolocator: ^14.0.2
-  provider: ^6.1.5+1
+  
+  
+  # 状态管理：Riverpod (最优性能)
   flutter_riverpod: ^3.2.1
-  go_router: ^17.1.0 #跳转路由
+  provider: ^6.1.5+1
+  # 路由管理
+  go_router: ^17.1.0 
+  # 音视频与推流 (M1 Pro 硬件加速组合)
+  flutter_whip: ^0.5.5
+  video_player: ^2.11.0
+  # 摄像头与美颜
+  camera: ^0.12.0 #摄像头
+  flutter_gpu_video_filters: ^0.0.20  #美白美颜等等
+  opencv_dart: ^2.2.1+4  #美白美颜等等
+  # 定位与地理位置解析 (已适配 V2 Embedding)
+  geolocator: 13.0.1
+  geocoding: ^4.0.0
+  # 工具类
+  http: ^1.6.0
+  dio: ^5.9.2 #网络请求
+  permission_handler: ^12.0.1 #权限申请
+  torch_light: ^1.1.0 #手电筒控制
   qr_flutter: ^4.1.0 #二维码生成
+  image_picker: ^1.2.1  #调用相册
+  shared_preferences: ^2.5.4  #token持久化
+  flutter_launcher_icons: ^0.14.4
+dependency_overrides:
+  flutter_webrtc: ^1.4.0
+  uuid: ^3.0.7
+  flutter_hooks: ^0.21.3+1
+  hooks_riverpod: ^3.3.1
 
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/image/002.png"
+  
 
 
 
@@ -86,11 +116,10 @@ flutter:
   # "family" key with the font family name, and a "fonts" key with a
   # list giving the asset and other descriptors for the font. For
   # example:
-  # fonts:
-  #   - family: Schyler
-  #     fonts:
-  #       - asset: fonts/Schyler-Regular.ttf
-  #       - asset: fonts/Schyler-Italic.ttf
+  fonts:
+    - family: MyIcons # 自己起的名字
+      fonts:
+        - asset: assets/font/iconfont.ttf
   #         style: italic
   #   - family: Trajan Pro
   #     fonts:

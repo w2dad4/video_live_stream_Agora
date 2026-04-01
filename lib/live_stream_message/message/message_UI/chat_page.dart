@@ -1,11 +1,12 @@
+import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:video_live_stream/live_stream_My/meProvider.dart';
 import 'package:video_live_stream/live_stream_message/message/message_Data/chat_Model.dart';
-import 'package:video_live_stream/tool/dataTime.dart';
+import 'package:video_live_stream/live_stream_My/meProvider_data/meProvider.dart';
 
+//发消息页面
 class ChatPage extends ConsumerStatefulWidget {
   final String chatId;
   const ChatPage({super.key, required this.chatId});
@@ -15,12 +16,29 @@ class ChatPage extends ConsumerStatefulWidget {
 
 class ChatPageState extends ConsumerState<ChatPage> {
   final TextEditingController _textController = TextEditingController(); //控制器
-  late final ChatConversation? info = ref.watch(chatDetailProvider(widget.chatId)); //监听特定 chatId 的会话详情
-  Map<String, dynamic> get me => ref.watch(meProvider); // 当前用户信息
+  @override
+  void dispose() {
+    _textController.dispose();
+    super.dispose();
+  }
+
+  //发送消息的处理函数，包含输入验证和状态更新
+  void _handleSend() {
+    final text = _textController.text.trim();
+    if (text.isEmpty) return;
+    ref.read(messageProvider(widget.chatId).notifier).sendMessage(text);
+    _textController.clear();
+  }
+
   @override
   Widget build(BuildContext context) {
-    // 监听特定 chatId 的消息列表
+    //1. 监听特定 chatId 的消息列表
     final messageindex = ref.watch(messageProvider(widget.chatId));
+    // 2. 监听自己的信息
+    final me = ref.watch(meProvider);
+    // 3.监听对方的联系人详情
+    final info = ref.watch(chatDetailProvider(widget.chatId));
+
     return GestureDetector(
       onTap: () {
         FocusScope.of(context).unfocus(); //点击空白处能自动收缩键盘
@@ -32,7 +50,7 @@ class ChatPageState extends ConsumerState<ChatPage> {
           elevation: 0,
           centerTitle: true,
           //昵称
-          title: Text(info?.title ?? '', style: TextStyle(fontSize: 20, color: Colors.black)),
+          title: Text(info?.title ?? "", style: TextStyle(fontSize: 20, color: Colors.black)),
           leading: GestureDetector(
             child: Icon(Icons.arrow_back_ios),
             onTap: () {
@@ -49,7 +67,11 @@ class ChatPageState extends ConsumerState<ChatPage> {
               //x详细信息
               child: GestureDetector(
                 onTap: () {
-                  print('点击了详细信息');
+                  context.pushNamed(
+                    'Details',
+                    pathParameters: {'detailsId': widget.chatId}, //
+                    queryParameters: {'isFuren': 'true'}, //告诉详情页“我是聊天页，你等会点发信息直接 pop 就行”
+                  );
                 },
                 child: Icon(Icons.auto_awesome_sharp),
               ),
@@ -60,17 +82,21 @@ class ChatPageState extends ConsumerState<ChatPage> {
           children: [
             //消息区域
             Expanded(
-              child: ListView.builder(
-                reverse: true, // 【核心优化】新消息在底部，且键盘弹出时自动跟随
-                padding: EdgeInsets.symmetric(vertical: 15, horizontal: 12),
-                itemCount: messageindex.length,
-                itemBuilder: (context, index) {
-                  return _MessageBubble(
-                    message: messageindex[index], // 传入消息数据
-                    avatar: info?.avatar ?? '',
-                    myAvatar: me['avatar'] ?? '',
-                  );
-                },
+              child: messageindex.when(
+                data: (message) => ListView.builder(
+                  reverse: true, // 【核心优化】新消息在底部，且键盘弹出时自动跟随
+                  padding: EdgeInsets.symmetric(vertical: 15, horizontal: 12),
+                  itemCount: message.length,
+                  itemBuilder: (context, index) {
+                    return _MessageBubble(
+                      message: message[index], // 传入消息数据
+                      avatar: info?.iconUrl ?? '',
+                      myAvatar: me.avatar,
+                    );
+                  },
+                ),
+                error: (err, stack) => Center(child: Text('加载失败:$err')),
+                loading: () => Center(child: CircularProgressIndicator()),
               ),
             ),
             //输入区域
@@ -96,6 +122,7 @@ class ChatPageState extends ConsumerState<ChatPage> {
               child: Icon(CupertinoIcons.speaker_2, size: 25),
             ),
             const SizedBox(width: 8),
+            //输入框
             Expanded(
               child: Container(
                 width: MediaQuery.of(context).size.width,
@@ -103,11 +130,12 @@ class ChatPageState extends ConsumerState<ChatPage> {
                 decoration: BoxDecoration(borderRadius: BorderRadius.circular(4), color: Colors.white),
                 child: TextField(
                   controller: _textController,
+                  onSubmitted: (value) => _handleSend(), //按回车键发送消息
+                  onChanged: (value) => _handleSend, //输入内容变化时也调用发送函数，保持输入框和消息列表的同步
                   decoration: const InputDecoration(
                     border: InputBorder.none, //
                     contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: -16), //调整光标的位置，使其垂直居中
                   ),
-                  onChanged: (value) => _handleSend,
                 ),
               ),
             ),
@@ -123,13 +151,11 @@ class ChatPageState extends ConsumerState<ChatPage> {
             GestureDetector(
               onTap: _handleSend,
               child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(borderRadius: BorderRadius.circular(4), color: Color(0xff07C160)),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(borderRadius: BorderRadius.circular(4), color: const Color(0xff07C160)),
                 child: GestureDetector(
-                  onTap: () {
-                    print('点击了发送');
-                  },
-                  child: Text('发送', style: TextStyle(color: Colors.white)),
+                  onTap: _handleSend,
+                  child: Text('发送', style: const TextStyle(color: Colors.white)),
                 ),
               ),
             ),
@@ -138,18 +164,12 @@ class ChatPageState extends ConsumerState<ChatPage> {
       ),
     );
   }
-
-  void _handleSend() {
-    if (_textController.text.trim().isEmpty) return;
-    ref.read(messageProvider(widget.chatId).notifier).sendMessage(_textController.text);
-    _textController.clear();
-  }
 }
 
 //抽取气泡组件，减少主页面重绘压力
 class _MessageBubble extends StatelessWidget {
-  final String avatar; //对方的头像
-  final String myAvatar; //自己的头像
+  final String? avatar; //对方的头像
+  final String? myAvatar; //自己的头像
   final MessageModel message;
   const _MessageBubble({required this.message, required this.avatar, required this.myAvatar});
   @override
@@ -192,15 +212,40 @@ class _MessageBubble extends StatelessWidget {
           print('点击了${isMe ? "自己的" : "对方的"}头像');
         },
         child: (url != null && url.isNotEmpty)
-            ? ClipRRect(
-                borderRadius: BorderRadius.circular(5),
-                child: Image.network(url, width: 40, height: 40, fit: BoxFit.cover),
-              )
+            ? ClipRRect(borderRadius: BorderRadius.circular(5), child: _buildAvatarImage(url))
             : Container(
                 decoration: BoxDecoration(borderRadius: BorderRadius.circular(5), color: Colors.grey[500]),
                 child: Icon(isMe ? Icons.person : Icons.face, size: 40, color: isMe ? Colors.blue : Colors.green),
               ),
       ),
+    );
+  }
+
+  Widget _buildAvatarImage(String url) {
+    if (url.startsWith('http')) {
+      return Image.network(
+        url,
+        width: 40,
+        height: 40,
+        fit: BoxFit.cover,
+        errorBuilder: (_, error, stackTrace) => Image.asset('assets/image/002.png', width: 40, height: 40, fit: BoxFit.cover),
+      );
+    }
+    if (url.startsWith('/')) {
+      return Image.file(
+        File(url),
+        width: 40,
+        height: 40,
+        fit: BoxFit.cover,
+        errorBuilder: (_, error, stackTrace) => Image.asset('assets/image/002.png', width: 40, height: 40, fit: BoxFit.cover),
+      );
+    }
+    return Image.asset(
+      url,
+      width: 40,
+      height: 40,
+      fit: BoxFit.cover,
+      errorBuilder: (_, error, stackTrace) => Image.asset('assets/image/002.png', width: 40, height: 40, fit: BoxFit.cover),
     );
   }
 }
