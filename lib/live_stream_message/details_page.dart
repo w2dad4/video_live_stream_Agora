@@ -2,29 +2,52 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:video_live_stream/live_stream_My/meProvider_data/meProvider.dart';
 import 'package:video_live_stream/live_stream_message/contact/contact_Data/contact_model.dart';
 import 'package:video_live_stream/live_stream_message/contact/contact_Data/contact_provider.dart';
 import 'package:video_live_stream/live_stream_message/message/message_Data/chat_Model.dart';
 
+//这是聊天用户信息
 class DetailsPage extends ConsumerWidget {
   final String detailsId;
   final bool isFuren;
+  final String? initialTitle;
+  final String? initialAvatar;
+  final String? initialBgUrl;
 
-  const DetailsPage({super.key, required this.detailsId, this.isFuren = false});
+  const DetailsPage({super.key, required this.detailsId, this.isFuren = false, this.initialTitle, this.initialAvatar, this.initialBgUrl});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // 1. 利用 Riverpod 的 AsyncValue 处理状态
     final contactAsync = ref.watch(contactListProvider);
+    final me = ref.watch(meProvider);
 
     return contactAsync.when(
       data: (contacts) {
-        // 2. 直接通过 ContactModel 对象读取数据
-        ContactModel? targetContact = contacts.where((c) => c.id == detailsId).firstOrNull;
-
-        // 3. 降级兜底策略：如果联系人列表里没有，尝试从聊天记录 Provider 找（假设 chatDetailProvider 也返回 ContactModel）
+        ContactModel? targetContact;
+        // 2. 优先使用路由传参（避免跨页数据不同步）
+        if ((initialTitle?.isNotEmpty ?? false) || (initialAvatar?.isNotEmpty ?? false) || (initialBgUrl?.isNotEmpty ?? false)) {
+          targetContact = ContactModel(
+            id: detailsId,
+            title: initialTitle?.isNotEmpty == true ? initialTitle! : '未知用户', //
+            iconUrl: initialAvatar ?? '',
+            bgUrl: initialBgUrl ?? 'assets/image/010.jpeg',
+          );
+        }
+        // 3. 再用联系人列表兜底
+        targetContact ??= contacts.where((c) => c.id == detailsId).firstOrNull;
+        // 4. 再从聊天详情 Provider 兜底
         targetContact ??= ref.watch(chatDetailProvider(detailsId));
-
+        // 5. 如果是自己，使用 meProvider 信息兜底
+        if (targetContact == null && me.uid == detailsId) {
+          targetContact = ContactModel(
+            id: detailsId,
+            title: me.name?.isNotEmpty == true ? me.name! : '我', //
+            iconUrl: me.avatar?.isNotEmpty == true ? me.avatar! : 'assets/image/002.png',
+            bgUrl: 'assets/image/010.jpeg',
+          );
+        }
         // 4. 终极兜底：真的找不到该用户
         if (targetContact == null) {
           return Scaffold(
@@ -32,7 +55,6 @@ class DetailsPage extends ConsumerWidget {
             body: Center(child: Text("用户 $detailsId 不存在", style: const TextStyle(fontSize: 16))),
           );
         }
-
         // --- 核心渲染区：此时 targetContact 绝对是强类型的 ContactModel ---
         return Scaffold(
           extendBodyBehindAppBar: true,
@@ -40,7 +62,7 @@ class DetailsPage extends ConsumerWidget {
           appBar: AppBar(
             elevation: 0,
             backgroundColor: Colors.transparent,
-            surfaceTintColor: Colors.transparent,
+            surfaceTintColor: Colors.transparent, //
             leading: IconButton(icon: const Icon(Icons.arrow_back_ios), onPressed: () => context.pop()),
             actions: [
               Padding(
@@ -57,7 +79,7 @@ class DetailsPage extends ConsumerWidget {
                 children: [
                   const SizedBox(height: 120),
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 10), //
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
@@ -81,18 +103,27 @@ class DetailsPage extends ConsumerWidget {
     );
   }
 
-  // --- 以下 UI 组件全部剥离 dynamic，改为严格的强类型传参 ---
-
   Widget _buildBackgroundImage(String path) {
     if (path.isEmpty) return _buildDefaultBg();
-
     if (path.startsWith('http')) {
-      return Image.network(path, fit: BoxFit.cover, errorBuilder: (c, e, s) => _buildDefaultBg());
+      return Image.network(
+        path,
+        fit: BoxFit.cover,
+        errorBuilder: (c, e, s) => _buildDefaultBg(), //
+      );
     }
     if (path.startsWith('/')) {
-      return Image.file(File(path), fit: BoxFit.cover, errorBuilder: (c, e, s) => _buildDefaultBg());
+      return Image.file(
+        File(path),
+        fit: BoxFit.cover,
+        errorBuilder: (c, e, s) => _buildDefaultBg(), //
+      );
     }
-    return Image.asset(path, fit: BoxFit.cover, errorBuilder: (c, e, s) => _buildDefaultBg());
+    return Image.asset(
+      path,
+      fit: BoxFit.cover,
+      errorBuilder: (c, e, s) => _buildDefaultBg(), //
+    );
   }
 
   Widget _buildDefaultBg() => Image.asset('assets/image/010.jpeg', fit: BoxFit.cover);
@@ -104,13 +135,33 @@ class DetailsPage extends ConsumerWidget {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(40),
         color: Colors.white,
-        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 10)],
+        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 10)], //
       ),
       margin: const EdgeInsets.all(10),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(40),
-        child: (url.isNotEmpty && url.startsWith('http')) ? Image.network(url, fit: BoxFit.cover, errorBuilder: (c, e, s) => _fallbackIcon()) : _fallbackIcon(), // 如果后续加了本地路径/asset，也可在这里补充逻辑
-      ),
+      child: ClipRRect(borderRadius: BorderRadius.circular(40), child: _buildAvatarImage(url)),
+    );
+  }
+
+  Widget _buildAvatarImage(String url) {
+    if (url.isEmpty) return _fallbackIcon();
+    if (url.startsWith('http')) {
+      return Image.network(
+        url,
+        fit: BoxFit.cover,
+        errorBuilder: (c, e, s) => _fallbackIcon(), //
+      );
+    }
+    if (url.startsWith('/')) {
+      return Image.file(
+        File(url),
+        fit: BoxFit.cover,
+        errorBuilder: (c, e, s) => _fallbackIcon(), //
+      );
+    }
+    return Image.asset(
+      url,
+      fit: BoxFit.cover,
+      errorBuilder: (c, e, s) => _fallbackIcon(), //
     );
   }
 
@@ -122,14 +173,14 @@ class DetailsPage extends ConsumerWidget {
   Widget _buildTitleArea(String title, String id) {
     return Expanded(
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start, //
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
             title,
             style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+            overflow: TextOverflow.ellipsis, //
           ),
           const SizedBox(height: 4),
           Text('猫猫号: $id', style: const TextStyle(fontSize: 13, color: Colors.grey)),

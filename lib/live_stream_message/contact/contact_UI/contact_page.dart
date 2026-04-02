@@ -19,7 +19,10 @@ class ContactPage extends ConsumerWidget {
           //顶部添加好友的icon
           _buildTopHeader(context, topPadding),
           SliverList(
-            delegate: SliverChildBuilderDelegate((context, index) => _ContactTile(item: contacs[index]), childCount: contacs.length),
+            delegate: SliverChildBuilderDelegate(
+              (context, index) => _ContactTile(item: contacs[index]),
+              childCount: contacs.length,
+            ),
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 80)),
         ],
@@ -63,12 +66,26 @@ class _ContactTile extends StatelessWidget {
     return ListTile(
       onTap: () {
         if (item.id.isNotEmpty) {
-          context.pushNamed('Details', pathParameters: {'detailsId': item.id});
+          context.pushNamed(
+            'Details',
+            pathParameters: {'detailsId': item.id},
+            extra: {
+              'title': item.title,
+              'avatar': item.iconUrl,
+              'bgUrl': item.bgUrl,
+            },
+          );
         }
       },
-      leading: ClipRRect(borderRadius: BorderRadius.circular(8), child: _buildAvatar(item.iconUrl)),
+      leading: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: _buildAvatar(item.iconUrl),
+      ),
       title: Text(item.title, style: const TextStyle(fontSize: 16)),
-      subtitle: Transform.translate(offset: const Offset(0, 10), child: const Divider(height: 1, thickness: 0.5)),
+      subtitle: Transform.translate(
+        offset: const Offset(0, 10),
+        child: const Divider(height: 1, thickness: 0.5),
+      ),
     );
   }
 

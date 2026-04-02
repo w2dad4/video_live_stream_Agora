@@ -62,16 +62,12 @@ class _OnairPageState extends ConsumerState<OnairPage> {
             labelColor: Colors.black,
             indicatorSize: TabBarIndicatorSize.tab, //  指示器大小充满整个 Tab 区域
             unselectedLabelColor: Colors.grey[600],
-            unselectedLabelStyle: const TextStyle(
-              fontWeight: FontWeight.normal,
-            ), //未选中标签的样式
+            unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal), //未选中标签的样式
             overlayColor: WidgetStateProperty.all(Colors.transparent), //点击没有水波纹
             dividerColor: Colors.transparent, // 去除底部底线
           ),
         ),
-        body: TabBarView(
-          children: onAirList.map((item) => item['page'] as Widget).toList(),
-        ),
+        body: TabBarView(children: onAirList.map((item) => item['page'] as Widget).toList()),
       ),
     );
   }

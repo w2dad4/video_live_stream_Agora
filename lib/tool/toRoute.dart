@@ -1,7 +1,7 @@
 //统一管理整个项目的路由
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:video_live_stream/live_stream_My/myVideo.dart';
+import 'package:video_live_stream/config/login_UI.dart';
 import 'package:video_live_stream/live_stream_discover/onair_Page.dart';
 import 'package:video_live_stream/over_video/end.dart';
 import 'package:video_live_stream/start_video/start_video_mian.dart';
@@ -20,8 +20,10 @@ class Approute {
   //
   static final GoRouter router = GoRouter(
     navigatorKey: rootNavigatorKey, //把GoRouter绑定到全局Navigator
-    initialLocation: '/', //应用启动时默认进入的页面('/')表示首页
+    initialLocation: '/Login', //应用启动时默认进入的页面('/')表示首页
     routes: [
+      //登陆按钮路由配置
+      GoRoute(path: '/Login', name: 'Login', builder: (context, state) => const Login()),
       //1，首页
       GoRoute(path: '/', name: 'Mylivestream', builder: (context, state) => const Mylivestream()),
 
@@ -54,7 +56,14 @@ class Approute {
         builder: (context, state) {
           final id = state.pathParameters['detailsId'] ?? '';
           final isFuren = state.uri.queryParameters['isFuren'] == 'true'; //用于判断当前详情页是聊天页面还是联系人的详情页
-          return DetailsPage(detailsId: id, isFuren: isFuren);
+          final extra = state.extra as Map<String, dynamic>?;
+          return DetailsPage(
+            detailsId: id,
+            isFuren: isFuren, //
+            initialTitle: extra?['title']?.toString(),
+            initialAvatar: extra?['avatar']?.toString(),
+            initialBgUrl: extra?['bgUrl']?.toString(),
+          );
         },
       ),
       //7.联系人的设置页面（子路由）
@@ -85,7 +94,7 @@ class Approute {
       //9.跳转到语音主播
       GoRoute(
         path: '/AudioViode',
-        name: '/AudioViode',
+        name: 'AudioViode',
         builder: (context, state) {
           final id = state.extra as Map<String, dynamic>?;
           final audioID = id?['id'] ?? '';
@@ -95,7 +104,7 @@ class Approute {
       //10.当直播结束后，进入到结算页面，
       GoRoute(
         path: '/End',
-        name: '/End',
+        name: 'End',
         builder: (context, state) {
           //接收ID
           final extra = state.extra as Map<String, dynamic>?;
@@ -106,18 +115,10 @@ class Approute {
           return EndPage(audioID: audioID, startTime: startTime);
         },
       ),
-      //11. 从结算页面跳转到我的页面
+      //11. 从结算页面跳转到直播预览页面
       GoRoute(
-        path: '/Myvideo',
-        name: '/Myvideo',
-        builder: (context, state) {
-          return MyvideoPage();
-        },
-      ),
-      //跳转到直播预览页面
-      GoRoute(
-        path: '/OnairPage',
-        name: '/OnairPage',
+        path: '/Onair',
+        name: 'Onair',
         builder: (context, state) {
           return OnairPage();
         },

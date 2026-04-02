@@ -128,7 +128,7 @@ class StartVideoPage extends HookConsumerWidget {
                             }
                             // 只有点击“确认退出”，才执行真正的路由跳转
                             context.pushNamed(
-                              '/End',
+                              'End',
                               extra: {
                                 'id': currentRoomID,
                                 //把计算好的当前时间传递给子页面

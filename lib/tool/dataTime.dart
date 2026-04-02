@@ -54,14 +54,10 @@ class ConversationNotifier extends StateNotifier<List<ChatConversation>> {
   }
 }
 
-final conversationProvider =
-    StateNotifierProvider<ConversationNotifier, List<ChatConversation>>((ref) {
-      return ConversationNotifier();
-    });
-final chatDetailProvider = Provider.family<ChatConversation?, String>((
-  ref,
-  id,
-) {
+final conversationProvider = StateNotifierProvider<ConversationNotifier, List<ChatConversation>>((ref) {
+  return ConversationNotifier();
+});
+final chatDetailProvider = Provider.family<ChatConversation?, String>((ref, id) {
   // 关键：实时监听总列表
   final allList = ref.watch(conversationProvider);
   // 找到对应的那个会话
@@ -102,5 +98,3 @@ String formatDuration(int totalSencode) {
   final sencode = totalSencode % 60;
   return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${sencode.toString().padLeft(2, '0')}';
 }
-
-

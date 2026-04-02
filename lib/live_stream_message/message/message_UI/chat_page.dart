@@ -38,6 +38,15 @@ class ChatPageState extends ConsumerState<ChatPage> {
     final me = ref.watch(meProvider);
     // 3.监听对方的联系人详情
     final info = ref.watch(chatDetailProvider(widget.chatId));
+    final isSelfChat = me.uid == widget.chatId;
+    final targetTitle =
+        info?.title ?? (isSelfChat ? (me.name ?? '我') : '用户${widget.chatId}');
+    final targetAvatar =
+        info?.iconUrl ??
+        (isSelfChat
+            ? (me.avatar ?? 'assets/image/002.png')
+            : 'assets/image/002.png');
+    final targetBg = info?.bgUrl ?? 'assets/image/010.jpeg';
 
     return GestureDetector(
       onTap: () {
@@ -50,7 +59,10 @@ class ChatPageState extends ConsumerState<ChatPage> {
           elevation: 0,
           centerTitle: true,
           //昵称
-          title: Text(info?.title ?? "", style: TextStyle(fontSize: 20, color: Colors.black)),
+          title: Text(
+            targetTitle,
+            style: TextStyle(fontSize: 20, color: Colors.black),
+          ),
           leading: GestureDetector(
             child: Icon(Icons.arrow_back_ios),
             onTap: () {
@@ -70,7 +82,14 @@ class ChatPageState extends ConsumerState<ChatPage> {
                   context.pushNamed(
                     'Details',
                     pathParameters: {'detailsId': widget.chatId}, //
-                    queryParameters: {'isFuren': 'true'}, //告诉详情页“我是聊天页，你等会点发信息直接 pop 就行”
+                    queryParameters: {
+                      'isFuren': 'true',
+                    }, //告诉详情页“我是聊天页，你等会点发信息直接 pop 就行”
+                    extra: {
+                      'title': targetTitle,
+                      'avatar': targetAvatar,
+                      'bgUrl': targetBg,
+                    },
                   );
                 },
                 child: Icon(Icons.auto_awesome_sharp),
@@ -90,7 +109,7 @@ class ChatPageState extends ConsumerState<ChatPage> {
                   itemBuilder: (context, index) {
                     return _MessageBubble(
                       message: message[index], // 传入消息数据
-                      avatar: info?.iconUrl ?? '',
+                      avatar: targetAvatar,
                       myAvatar: me.avatar,
                     );
                   },
@@ -127,14 +146,21 @@ class ChatPageState extends ConsumerState<ChatPage> {
               child: Container(
                 width: MediaQuery.of(context).size.width,
                 height: 40,
-                decoration: BoxDecoration(borderRadius: BorderRadius.circular(4), color: Colors.white),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(4),
+                  color: Colors.white,
+                ),
                 child: TextField(
                   controller: _textController,
                   onSubmitted: (value) => _handleSend(), //按回车键发送消息
-                  onChanged: (value) => _handleSend, //输入内容变化时也调用发送函数，保持输入框和消息列表的同步
+                  onChanged: (value) =>
+                      _handleSend, //输入内容变化时也调用发送函数，保持输入框和消息列表的同步
                   decoration: const InputDecoration(
                     border: InputBorder.none, //
-                    contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: -16), //调整光标的位置，使其垂直居中
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: -16,
+                    ), //调整光标的位置，使其垂直居中
                   ),
                 ),
               ),
@@ -151,11 +177,20 @@ class ChatPageState extends ConsumerState<ChatPage> {
             GestureDetector(
               onTap: _handleSend,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(borderRadius: BorderRadius.circular(4), color: const Color(0xff07C160)),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(4),
+                  color: const Color(0xff07C160),
+                ),
                 child: GestureDetector(
                   onTap: _handleSend,
-                  child: Text('发送', style: const TextStyle(color: Colors.white)),
+                  child: Text(
+                    '发送',
+                    style: const TextStyle(color: Colors.white),
+                  ),
                 ),
               ),
             ),
@@ -171,16 +206,23 @@ class _MessageBubble extends StatelessWidget {
   final String? avatar; //对方的头像
   final String? myAvatar; //自己的头像
   final MessageModel message;
-  const _MessageBubble({required this.message, required this.avatar, required this.myAvatar});
+  const _MessageBubble({
+    required this.message,
+    required this.avatar,
+    required this.myAvatar,
+  });
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: message.isMe ? MainAxisAlignment.end : MainAxisAlignment.start, //
+        mainAxisAlignment: message.isMe
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start, //
         children: [
-          if (!message.isMe) _builAvatar(avatar, isMe: false), // 对方消息显示在左侧，先显示头像
+          if (!message.isMe)
+            _builAvatar(avatar, isMe: false), // 对方消息显示在左侧，先显示头像
           const SizedBox(width: 10),
           Flexible(
             child: Container(
@@ -189,11 +231,15 @@ class _MessageBubble extends StatelessWidget {
                 borderRadius: BorderRadius.circular(10), //
                 color: message.isMe ? Color(0xFF95EC69) : Colors.white,
               ),
-              child: Text(message.content, style: TextStyle(fontSize: 16, color: Colors.black)),
+              child: Text(
+                message.content,
+                style: TextStyle(fontSize: 16, color: Colors.black),
+              ),
             ),
           ),
           const SizedBox(width: 10),
-          if (message.isMe) _builAvatar(myAvatar, isMe: true), // 自己的消息显示在右侧，最后显示头像
+          if (message.isMe)
+            _builAvatar(myAvatar, isMe: true), // 自己的消息显示在右侧，最后显示头像
         ],
       ),
     );
@@ -212,10 +258,20 @@ class _MessageBubble extends StatelessWidget {
           print('点击了${isMe ? "自己的" : "对方的"}头像');
         },
         child: (url != null && url.isNotEmpty)
-            ? ClipRRect(borderRadius: BorderRadius.circular(5), child: _buildAvatarImage(url))
+            ? ClipRRect(
+                borderRadius: BorderRadius.circular(5),
+                child: _buildAvatarImage(url),
+              )
             : Container(
-                decoration: BoxDecoration(borderRadius: BorderRadius.circular(5), color: Colors.grey[500]),
-                child: Icon(isMe ? Icons.person : Icons.face, size: 40, color: isMe ? Colors.blue : Colors.green),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(5),
+                  color: Colors.grey[500],
+                ),
+                child: Icon(
+                  isMe ? Icons.person : Icons.face,
+                  size: 40,
+                  color: isMe ? Colors.blue : Colors.green,
+                ),
               ),
       ),
     );
@@ -228,7 +284,12 @@ class _MessageBubble extends StatelessWidget {
         width: 40,
         height: 40,
         fit: BoxFit.cover,
-        errorBuilder: (_, error, stackTrace) => Image.asset('assets/image/002.png', width: 40, height: 40, fit: BoxFit.cover),
+        errorBuilder: (_, error, stackTrace) => Image.asset(
+          'assets/image/002.png',
+          width: 40,
+          height: 40,
+          fit: BoxFit.cover,
+        ),
       );
     }
     if (url.startsWith('/')) {
@@ -237,7 +298,12 @@ class _MessageBubble extends StatelessWidget {
         width: 40,
         height: 40,
         fit: BoxFit.cover,
-        errorBuilder: (_, error, stackTrace) => Image.asset('assets/image/002.png', width: 40, height: 40, fit: BoxFit.cover),
+        errorBuilder: (_, error, stackTrace) => Image.asset(
+          'assets/image/002.png',
+          width: 40,
+          height: 40,
+          fit: BoxFit.cover,
+        ),
       );
     }
     return Image.asset(
@@ -245,7 +311,12 @@ class _MessageBubble extends StatelessWidget {
       width: 40,
       height: 40,
       fit: BoxFit.cover,
-      errorBuilder: (_, error, stackTrace) => Image.asset('assets/image/002.png', width: 40, height: 40, fit: BoxFit.cover),
+      errorBuilder: (_, error, stackTrace) => Image.asset(
+        'assets/image/002.png',
+        width: 40,
+        height: 40,
+        fit: BoxFit.cover,
+      ),
     );
   }
 }

@@ -19,18 +19,19 @@ class EndPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // 1. 获取进入页面的当前时间作为结束时间
     final endTime = DateTime.now();
+    //系统手势滑动跳转到直播预览页面
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
-        context.goNamed('/OnairPage');
+        context.goNamed('Mylivestream');
       },
       child: Scaffold(
         backgroundColor: const Color.fromARGB(255, 1, 13, 42),
         appBar: AppBar(
           backgroundColor: const Color.fromARGB(255, 1, 13, 42),
           leading: IconButton(
-            onPressed: () => context.goNamed('/OnairPage'),
+            onPressed: () => context.goNamed('Mylivestream'),
             icon: Icon(Icons.arrow_back_ios, color: Colors.white),
           ),
         ),
