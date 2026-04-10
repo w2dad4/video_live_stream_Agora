@@ -227,7 +227,7 @@ class Positions extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10),
       child: Column(
         children: [
-          _buildItem('签名', Icons.edit_note_outlined, onTap: () => print('点击了签名')),
+          _buildSignatureItem(),
           const Divider(height: 1, color: Color(0xFFEEEEEE)),
           _buildItem('送礼', Icons.card_giftcard, onTap: () => print('点击了送礼')),
           const Divider(height: 1, color: Color(0xFFEEEEEE)),
@@ -243,6 +243,15 @@ class Positions extends StatelessWidget {
       contentPadding: EdgeInsets.zero,
       title: Text(label, style: const TextStyle(fontSize: 16)),
       trailing: Icon(icon, color: Colors.grey[400], size: 20),
+    );
+  }
+
+  Widget _buildSignatureItem() {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      title: const Text('签名', style: TextStyle(fontSize: 16)),
+      subtitle: const Text('这只小猫很懒，还没有签名喵~', style: TextStyle(fontSize: 13, color: Colors.grey)),
+      trailing: Icon(Icons.edit_note_outlined, color: Colors.grey[400], size: 20),
     );
   }
 }

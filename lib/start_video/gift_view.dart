@@ -9,7 +9,7 @@ import 'package:video_live_stream/start_video/logic/stream_service.dart';
 import 'package:video_live_stream/start_video/maxim.dart';
 import 'package:video_live_stream/start_video/room_manager_logic.dart';
 import 'package:video_live_stream/tool/dataTime.dart';
-import 'package:video_live_stream/tool/dialogbox.dart'; // 禁言管理
+import 'package:video_live_stream/utility/dialogbox.dart'; // 禁言管理
 
 //主播内容
 class BottomActionBar extends ConsumerWidget {

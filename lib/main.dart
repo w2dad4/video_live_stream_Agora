@@ -6,9 +6,14 @@ import 'package:video_live_stream/live_stream_discover/onair_Page.dart';
 import 'package:video_live_stream/live_stream_homePage/myHomeTab.dart';
 import 'package:video_live_stream/live_stream_message/messagepage_main.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:video_live_stream/tool/toRoute.dart'; //这个需要手动导入
+import 'package:video_live_stream/config/login_provider.dart';
+import 'package:video_live_stream/utility/toRoute.dart'; //这个需要手动导
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  if (await readIsLoggedIn()) {
+    Approute.initialLocation = '/';
+  }
   runApp(const ProviderScope(child: MyApp()));
 }
 
@@ -19,7 +24,7 @@ class MyApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp.router(
       routerConfig: Approute.router, // 引用你定义的 GoRouter
-      title: '小猫快播',
+      title: '小猫啵啵',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple)),
     );
@@ -87,7 +92,6 @@ class MyMylivestreamState extends State<Mylivestream> {
               final int idx = entry.key;
               final item = entry.value;
               final bool isSelected = _currentIndex == idx;
-
               return Expanded(
                 child: GestureDetector(
                   onTap: () => setState(() => _currentIndex = idx),

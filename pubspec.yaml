@@ -39,7 +39,6 @@ dependencies:
   
   # 状态管理：Riverpod (最优性能)
   flutter_riverpod: ^3.2.1
-  provider: ^6.1.5+1
   # 路由管理
   go_router: ^17.1.0 
   # 音视频与推流 (M1 Pro 硬件加速组合)
@@ -48,7 +47,6 @@ dependencies:
   # 摄像头与美颜
   camera: ^0.12.0 #摄像头
   flutter_gpu_video_filters: ^0.0.20  #美白美颜等等
-  opencv_dart: ^2.2.1+4  #美白美颜等等
   # 定位与地理位置解析 (已适配 V2 Embedding)
   geolocator: 13.0.1
   geocoding: ^4.0.0
@@ -59,18 +57,20 @@ dependencies:
   torch_light: ^1.1.0 #手电筒控制
   qr_flutter: ^4.1.0 #二维码生成
   image_picker: ^1.2.1  #调用相册
-  shared_preferences: ^2.5.4  #token持久化
+  shared_preferences: ^2.5.5  #token持久化
   flutter_launcher_icons: ^0.14.4
+  mobile_scanner: ^7.2.0
 dependency_overrides:
   flutter_webrtc: ^1.4.0
   uuid: ^3.0.7
   flutter_hooks: ^0.21.3+1
   hooks_riverpod: ^3.3.1
+  device_info_plus: ^12.4.0 #自动识别设备号
 
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/image/002.png"
+  image_path: "assets/icon/Logo.jpg"
   
 
 
@@ -94,6 +94,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/image/
+    - assets/icon/
     - assets/video/  # 必须精确到文件名，或者写目录名 assets/video/
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in

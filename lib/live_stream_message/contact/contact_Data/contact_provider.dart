@@ -30,19 +30,20 @@ class ContactNotifier extends AsyncNotifier<List<ContactModel>> {
     });
   }
 
-  // 删除联系人
+  // 删除联系人（持久化中同步删除，不含「自己」）
   Future<void> delete(String id) async {
     final myId = ref.read(meProvider).uid ?? '';
     if (id == myId) {
-      // “我自己”固定在联系人中，不允许删除
       return;
     }
     final previousState = state.value ?? [];
-    state = AsyncValue.data(previousState.where((c) => c.id != id).toList());
+    final nextUi = previousState.where((c) => c.id != id).toList();
+    state = AsyncValue.data(nextUi);
     try {
-      // await ref.read(contactRepositoryProvider).apiDelete(id);
+      final toSave = nextUi.where((c) => c.tag != '自己').toList();
+      await ref.read(contactModelProvider).replaceAll(toSave);
     } catch (e) {
-      state = AsyncValue.data(previousState); //失败回滚
+      state = AsyncValue.data(previousState);
     }
   }
 

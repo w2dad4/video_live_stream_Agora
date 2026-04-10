@@ -7,19 +7,23 @@ import 'package:video_live_stream/live_stream_message/message/message_Data/chat_
 
 //用于更新发送时间和信息
 //会话列表provider,
-final messageModelProvider = StateNotifierProvider<MessageModelNotifier, List<ChatConversation>>((ref) {
-  final notifier = MessageModelNotifier(ref);
-  ref.listen<UserMe>(meProvider, (previous, next) {
-    notifier.syncSelfConversation(next);
-  });
-  ref.listen<AsyncValue<List<ContactModel>>>(contactListProvider, (previous, next) {
-    final contacts = next.value;
-    if (contacts != null) {
-      notifier.syncConversationProfiles(contacts);
-    }
-  });
-  return notifier;
-});
+final messageModelProvider =
+    StateNotifierProvider<MessageModelNotifier, List<ChatConversation>>((ref) {
+      final notifier = MessageModelNotifier(ref);
+      ref.listen<UserMe>(meProvider, (previous, next) {
+        notifier.syncSelfConversation(next);
+      });
+      ref.listen<AsyncValue<List<ContactModel>>>(contactListProvider, (
+        previous,
+        next,
+      ) {
+        final contacts = next.value;
+        if (contacts != null) {
+          notifier.syncConversationProfiles(contacts);
+        }
+      });
+      return notifier;
+    });
 
 class ChatConversation {
   final String id;
@@ -64,15 +68,33 @@ class MessageModelNotifier extends StateNotifier<List<ChatConversation>> {
   void _bootstrapSelfConversation() {
     final me = ref.read(meProvider);
     final uid = me.uid?.trim().isNotEmpty == true ? me.uid!.trim() : 'self';
-    final title = (me.name?.trim().isNotEmpty == true) ? me.name!.trim() : '我'; //
-    final avatar = (me.avatar?.trim().isNotEmpty == true) ? me.avatar!.trim() : 'assets/image/002.png';
-    state = [ChatConversation(id: uid, title: title, avatar: avatar, bgUrl: 'assets/image/010.jpeg', lastMessage: '这是你自己', createdAt: DateTime(2026, 1, 1, 0, 0)), ...state.where((e) => e.id != uid)];
+    final title = (me.name?.trim().isNotEmpty == true)
+        ? me.name!.trim()
+        : '我'; //
+    final avatar = (me.avatar?.trim().isNotEmpty == true)
+        ? me.avatar!.trim()
+        : 'assets/image/002.png';
+    state = [
+      ChatConversation(
+        id: uid,
+        title: title,
+        avatar: avatar,
+        bgUrl: 'assets/image/010.jpeg',
+        lastMessage: '这是你自己',
+        createdAt: DateTime(2026, 1, 1, 0, 0),
+      ),
+      ...state.where((e) => e.id != uid),
+    ];
   }
 
   void syncSelfConversation(UserMe me) {
     final uid = me.uid?.trim().isNotEmpty == true ? me.uid!.trim() : 'self';
-    final title = (me.name?.trim().isNotEmpty == true) ? me.name!.trim() : '我'; //
-    final avatar = (me.avatar?.trim().isNotEmpty == true) ? me.avatar!.trim() : 'assets/image/002.png';
+    final title = (me.name?.trim().isNotEmpty == true)
+        ? me.name!.trim()
+        : '我'; //
+    final avatar = (me.avatar?.trim().isNotEmpty == true)
+        ? me.avatar!.trim()
+        : 'assets/image/002.png';
 
     final idx = state.indexWhere((e) => e.id == uid);
     if (idx >= 0) {
@@ -100,14 +122,19 @@ class MessageModelNotifier extends StateNotifier<List<ChatConversation>> {
     state = [
       for (final conv in state)
         if (contactMap.containsKey(conv.id)) //
-          conv.copyWith(title: contactMap[conv.id]!.title, avatar: contactMap[conv.id]!.iconUrl, bgUrl: contactMap[conv.id]!.bgUrl)
+          conv.copyWith(
+            title: contactMap[conv.id]!.title,
+            avatar: contactMap[conv.id]!.iconUrl,
+            bgUrl: contactMap[conv.id]!.bgUrl,
+          )
         else
           conv,
     ];
   }
 
   ({String title, String avatar, String bgUrl}) _resolveProfile(String chatId) {
-    final contacts = ref.read(contactListProvider).value ?? const <ContactModel>[];
+    final contacts =
+        ref.read(contactListProvider).value ?? const <ContactModel>[];
     for (final c in contacts) {
       if (c.id == chatId) {
         return (title: c.title, avatar: c.iconUrl, bgUrl: c.bgUrl); //
@@ -117,7 +144,10 @@ class MessageModelNotifier extends StateNotifier<List<ChatConversation>> {
     if (me.uid == chatId) {
       return (
         title: me.name?.isNotEmpty == true ? me.name! : '我', //
-        avatar: me.avatar?.isNotEmpty == true ? me.avatar! : 'assets/image/002.png', bgUrl: 'assets/image/010.jpeg',
+        avatar: me.avatar?.isNotEmpty == true
+            ? me.avatar!
+            : 'assets/image/002.png',
+        bgUrl: 'assets/image/010.jpeg',
       );
     }
     return (
@@ -128,7 +158,13 @@ class MessageModelNotifier extends StateNotifier<List<ChatConversation>> {
   }
 
   //当聊天输入页面有了新消息时，那么就会更新聊天预览页面
-  void updataListsMessage(String chatId, MessageModel latestMsg, {String? title, String? avatar, String? bgUrl}) {
+  void updataListsMessage(
+    String chatId,
+    MessageModel latestMsg, {
+    String? title,
+    String? avatar,
+    String? bgUrl,
+  }) {
     final idx = state.indexWhere((conv) => conv.id == chatId);
     if (idx >= 0) {
       final updated = [...state];
@@ -174,6 +210,14 @@ class MessageModelNotifier extends StateNotifier<List<ChatConversation>> {
     state = [
       for (final conv in state)
         if (conv.id != chatId) conv,
+    ];
+  }
+
+  // 仅清空会话预览文案，不删除会话本身
+  void clearConversationPreview(String chatId) {
+    state = [
+      for (final conv in state)
+        if (conv.id == chatId) conv.copyWith(lastMessage: '') else conv,
     ];
   }
 }

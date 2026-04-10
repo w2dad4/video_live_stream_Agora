@@ -16,30 +16,15 @@ class MessageModel {
   final MessageStatus status;
   final bool isMe;
   final DateTime timestamp;
-  MessageModel({
-    required this.id,
-    required this.isMe,
-    required this.timestamp,
-    required this.content,
-    this.status = MessageStatus.sent,
-  });
+  MessageModel({required this.id, required this.isMe, required this.timestamp, required this.content, this.status = MessageStatus.sent});
   // 提供 copyWith 方便局部更新状态
   MessageModel copyWith({MessageStatus? status, String? content}) {
-    return MessageModel(
-      id: id,
-      isMe: isMe,
-      timestamp: timestamp,
-      content: content ?? this.content,
-      status: status ?? this.status,
-    );
+    return MessageModel(id: id, isMe: isMe, timestamp: timestamp, content: content ?? this.content, status: status ?? this.status);
   }
 }
 
 // 2. Provider 定义
-final messageProvider =
-    AsyncNotifierProvider.family<MessageNotifier, List<MessageModel>, String>(
-      MessageNotifier.new,
-    );
+final messageProvider = AsyncNotifierProvider.family<MessageNotifier, List<MessageModel>, String>(MessageNotifier.new);
 
 // 2. Provider 定义
 final chatDetailProvider = Provider.family<ContactModel?, String>((ref, id) {
@@ -85,37 +70,23 @@ class MessageNotifier extends AsyncNotifier<List<MessageModel>> {
         .updataListsMessage(
           roomId,
           tempMsg,
-          title: detail?.title ?? (isSelf ? (me.name ?? '我') : '用户$roomId'),
-          avatar:
-              detail?.iconUrl ??
-              (isSelf
-                  ? (me.avatar ?? 'assets/image/002.png')
-                  : 'assets/image/002.png'),
+          title: detail?.title ?? (isSelf ? (me.name ?? '我') : '用户$roomId'), //
+          avatar: detail?.iconUrl ?? (isSelf ? (me.avatar ?? 'assets/image/002.png') : 'assets/image/002.png'),
           bgUrl: detail?.bgUrl ?? 'assets/image/010.jpeg',
         );
     try {
       await repo.sendMessage(roomId, tempMsg);
       // 发送成功：更新该条消息状态为 sent
-      state = AsyncValue.data(
-        state.value!
-            .map(
-              (m) => m.id == tempMsg.id
-                  ? m.copyWith(status: MessageStatus.sent)
-                  : m,
-            )
-            .toList(),
-      );
+      state = AsyncValue.data(state.value!.map((m) => m.id == tempMsg.id ? m.copyWith(status: MessageStatus.sent) : m).toList());
     } catch (e) {
       // 发送失败：更新该条消息状态为 fail (修复笔误)
-      state = AsyncValue.data(
-        state.value!
-            .map(
-              (m) => m.id == tempMsg.id
-                  ? m.copyWith(status: MessageStatus.fail)
-                  : m,
-            )
-            .toList(),
-      );
+      state = AsyncValue.data(state.value!.map((m) => m.id == tempMsg.id ? m.copyWith(status: MessageStatus.fail) : m).toList());
     }
+  }
+
+  Future<void> clearLocalMessages() async {
+    final repo = ref.read(chatRepositoryProvider);
+    state = const AsyncValue.data([]);
+    await repo.clearRoomMessages(roomId);
   }
 }

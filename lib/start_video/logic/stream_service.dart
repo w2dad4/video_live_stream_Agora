@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/legacy.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:flutter_whip/flutter_whip.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:video_live_stream/config/constants.dart';
+import 'package:video_live_stream/live_stream_message/contact/contact_UI/constants.dart';
 import 'package:video_live_stream/live_stream_discover/live_streaming_starts/logic_layer_data/logic_layer.dart';
 
 //推流专用

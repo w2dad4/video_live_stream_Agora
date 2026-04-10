@@ -3,18 +3,50 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:video_live_stream/live_stream_discover/select_Album/dialogbox.dart';
 
-final meProvider = StateProvider<UserMe>((ref) => UserMe(uid: 'me_123', name: '杨咩咩', avatar: 'assets/image/002.png', ip: 'null')); //注册用户的参数
+final meProvider = StateProvider<UserMe>(
+  (ref) => UserMe(
+    uid: 'me_123',
+    name: '杨咩咩',
+    avatar: 'assets/image/002.png', //
+    ip: 'null',
+  ),
+); //注册用户的参数
 
 class UserMe {
   final String? uid;
   final String? name;
   final String? avatar;
   final String? ip;
+  final String? gender; // 性别
+  final String? region; // 地区
+  final String? signature; // 个性签名
   // ignore: non_constant_identifier_names
-  UserMe({required this.uid, required this.name, this.avatar, this.ip});
+  UserMe({
+    required this.uid,
+    required this.name,
+    this.avatar,
+    this.ip,
+    this.gender = '未设置',
+    this.region = '未设置',
+    this.signature = '这个人很懒，还没有签名', //
+  });
 
-  UserMe copyWith({String? avatar, String? name}) {
-    return UserMe(uid: uid, name: name ?? this.name, avatar: avatar ?? this.avatar, ip: ip);
+  UserMe copyWith({
+    String? avatar,
+    String? name,
+    String? gender,
+    String? region,
+    String? signature, //
+  }) {
+    return UserMe(
+      uid: uid,
+      name: name ?? this.name,
+      avatar: avatar ?? this.avatar,
+      ip: ip,
+      gender: gender ?? this.gender, //
+      region: region ?? this.region,
+      signature: signature ?? this.signature,
+    );
   }
 }
 
@@ -71,10 +103,24 @@ class LiveRecommndItem {
   final String cover; //封面
   final String region; //是否开播
   final DateTime startedAt;
-  LiveRecommndItem({required this.liveID, required this.title, required this.hostname, required this.cover, required this.region, required this.startedAt});
+  LiveRecommndItem({
+    required this.liveID,
+    required this.title, //
+    required this.hostname,
+    required this.cover,
+    required this.region,
+    required this.startedAt,
+  });
   //copyWith 方法：这是 Flutter 中处理不可变数据的标准做法。它允许你修改某个对象的个别属性，同时产生一个新的对象，而不会破坏原来的对象
   LiveRecommndItem copyWith({String? hostname, String? title, String? cover, String? region, DateTime? startedAt}) {
-    return LiveRecommndItem(liveID: liveID, title: title ?? this.title, hostname: hostname ?? this.hostname, cover: cover ?? this.cover, region: '', startedAt: startedAt ?? this.startedAt);
+    return LiveRecommndItem(
+      liveID: liveID,
+      title: title ?? this.title, //
+      hostname: hostname ?? this.hostname,
+      cover: cover ?? this.cover,
+      region: '',
+      startedAt: startedAt ?? this.startedAt,
+    );
   }
 }
 

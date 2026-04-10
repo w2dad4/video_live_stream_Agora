@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:video_live_stream/live_stream_My/meProvider_data/meProvider.dart';
-import 'package:video_live_stream/tool/icon.dart';
+import 'package:video_live_stream/utility/icon.dart';
 
 class ApplyPage extends ConsumerWidget {
   const ApplyPage({super.key});

@@ -80,14 +80,16 @@ class AnchorNotifier extends StateNotifier<AnchorState> {
     final last = await Geolocator.getLastKnownPosition();
     if (last != null) return last;
 
-    // 核心修复：平铺参数，不使用 LocationSettings 对象
-    // ignore: deprecated_member_use
     try {
       return await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.low, timeLimit: Duration(seconds: 12)),
+        desiredAccuracy: LocationAccuracy.lowest,
+        timeLimit: const Duration(seconds: 28),
       );
     } on TimeoutException {
-      throw '定位超时';
+      return await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.medium,
+        timeLimit: const Duration(seconds: 35),
+      );
     }
   }
 }

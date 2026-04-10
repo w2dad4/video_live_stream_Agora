@@ -1,5 +1,6 @@
 // 抽象接口，方便后续做单元测试或更换实现
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:video_live_stream/live_stream_message/contact/contact_Data/social_local_storage.dart';
 import 'package:video_live_stream/live_stream_message/message/message_Data/chat_Model.dart';
 
 class ChatRepository {
@@ -12,10 +13,16 @@ class ChatRepository {
   }
 
   //模拟发送信息
+  Future<void> clearRoomMessages(String chatID) async {
+    await SocialLocalStorage.clearChatMessages(chatID);
+  }
+
   Future<bool> sendMessage(String chatID, MessageModel message) async {
     await Future.delayed(const Duration(microseconds: 300));
     return true;
   }
+
+  Future<void> replaceRoomMessages(String roomId, List<MessageModel> sentList) async {}
 }
 
 final chatRepositoryProvider = Provider((ref) => ChatRepository());

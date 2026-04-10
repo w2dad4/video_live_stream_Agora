@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
+//可复用的液态玻璃效果
 class GlassContainer extends StatelessWidget {
   final Widget child;
   final double blur;

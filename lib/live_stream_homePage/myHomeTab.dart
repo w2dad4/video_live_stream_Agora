@@ -6,8 +6,9 @@ import 'package:video_live_stream/live_stream_homePage/first_Page/first_page.dar
 import 'package:video_live_stream/live_stream_homePage/pk_page/pk_page.dart';
 import 'package:video_live_stream/live_stream_homePage/recommend_page/recommend.dart';
 import 'package:video_live_stream/tool/color.dart';
-import 'package:video_live_stream/tool/glass.dart';
+import 'package:video_live_stream/utility/glass.dart';
 import 'package:video_live_stream/tool/onRefresh.dart';
+import 'package:video_live_stream/tool/permission_manager.dart';
 
 class MyHomeTab extends StatefulWidget {
   const MyHomeTab({super.key});
@@ -26,24 +27,26 @@ class _MyHomePageState extends State<MyHomeTab> {
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: _listTabs.length,
-      child: Scaffold(
-        extendBodyBehindAppBar: true,
-        backgroundColor: ColorState.white,
+    return HomePermissionRequest(
+      child: DefaultTabController(
+        length: _listTabs.length,
+        child: Scaffold(
+          extendBodyBehindAppBar: true,
+          backgroundColor: ColorState.white,
 
-        body: Stack(
-          children: [
-            TabBarView(
-              children: _listTabs.map((item) {
-                return Padding(
-                  padding: EdgeInsets.only(top: Positions.topPadding(context) + 60),
-                  child: item['page'] as Widget,
-                );
-              }).toList(),
-            ),
-            Positioned(top: Positions.topPadding(context) + 5, left: 0, right: 0, child: _buildGlassTabBar()),
-          ],
+          body: Stack(
+            children: [
+              TabBarView(
+                children: _listTabs.map((item) {
+                  return Padding(
+                    padding: EdgeInsets.only(top: Positions.topPadding(context) + 60),
+                    child: item['page'] as Widget,
+                  );
+                }).toList(),
+              ),
+              Positioned(top: Positions.topPadding(context) + 5, left: 0, right: 0, child: _buildGlassTabBar()),
+            ],
+          ),
         ),
       ),
     );

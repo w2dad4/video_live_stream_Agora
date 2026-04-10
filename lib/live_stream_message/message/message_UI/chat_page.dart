@@ -3,6 +3,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:video_live_stream/live_stream_message/contact/contact_Data/group_chat_provider.dart';
+import 'package:video_live_stream/live_stream_message/contact/contact_Data/group_read_provider.dart';
 import 'package:video_live_stream/live_stream_message/message/message_Data/chat_Model.dart';
 import 'package:video_live_stream/live_stream_My/meProvider_data/meProvider.dart';
 
@@ -16,6 +18,7 @@ class ChatPage extends ConsumerStatefulWidget {
 
 class ChatPageState extends ConsumerState<ChatPage> {
   final TextEditingController _textController = TextEditingController(); //控制器
+  bool _didMarkRead = false;
   @override
   void dispose() {
     _textController.dispose();
@@ -38,9 +41,21 @@ class ChatPageState extends ConsumerState<ChatPage> {
     final me = ref.watch(meProvider);
     // 3.监听对方的联系人详情
     final info = ref.watch(chatDetailProvider(widget.chatId));
+    final group = ref.watch(groupDetailProvider(widget.chatId));
+    final isGroup = info?.tag == '群聊' || group != null;
+    if (isGroup && !_didMarkRead) {
+      _didMarkRead = true;
+      Future.microtask(() async {
+        await ref
+            .read(groupReadProvider.notifier)
+            .markGroupAsRead(widget.chatId);
+      });
+    }
     final isSelfChat = me.uid == widget.chatId;
     final targetTitle =
-        info?.title ?? (isSelfChat ? (me.name ?? '我') : '用户${widget.chatId}');
+        group?.groupName ??
+        info?.title ??
+        (isSelfChat ? (me.name ?? '我') : '用户${widget.chatId}');
     final targetAvatar =
         info?.iconUrl ??
         (isSelfChat
@@ -79,18 +94,25 @@ class ChatPageState extends ConsumerState<ChatPage> {
               //x详细信息
               child: GestureDetector(
                 onTap: () {
-                  context.pushNamed(
-                    'Details',
-                    pathParameters: {'detailsId': widget.chatId}, //
-                    queryParameters: {
-                      'isFuren': 'true',
-                    }, //告诉详情页“我是聊天页，你等会点发信息直接 pop 就行”
-                    extra: {
-                      'title': targetTitle,
-                      'avatar': targetAvatar,
-                      'bgUrl': targetBg,
-                    },
-                  );
+                  if (isGroup) {
+                    context.pushNamed(
+                      'GroupInfo',
+                      pathParameters: {'groupId': widget.chatId},
+                    );
+                  } else {
+                    context.pushNamed(
+                      'Details',
+                      pathParameters: {'detailsId': widget.chatId}, //
+                      queryParameters: {
+                        'isFuren': 'true',
+                      }, //告诉详情页“我是聊天页，你等会点发信息直接 pop 就行”
+                      extra: {
+                        'title': targetTitle,
+                        'avatar': targetAvatar,
+                        'bgUrl': targetBg,
+                      },
+                    );
+                  }
                 },
                 child: Icon(Icons.auto_awesome_sharp),
               ),

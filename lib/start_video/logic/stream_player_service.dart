@@ -3,7 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:video_live_stream/config/constants.dart';
+import 'package:video_live_stream/live_stream_message/contact/contact_UI/constants.dart';
 
 //拉流专用
 final streamPlayerServiceProvider = AsyncNotifierProvider.family.autoDispose<StreamPlayerService, void, String>((audienceID) => StreamPlayerService(audienceID));
