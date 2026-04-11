@@ -43,3 +43,99 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# ============================================
+# Node.js / Server 相关
+# ============================================
+# 依赖目录
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 锁文件（可选：如果希望锁定依赖版本，可以保留 package-lock.json）
+# package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# 环境变量文件（包含敏感信息）
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# 日志文件
+logs/
+*.log
+server/logs/
+server/*.log
+
+# 运行时数据
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# 生成的密钥文件
+*.pem
+*.key
+*.crt
+
+# ============================================
+# Flutter / Dart 补充
+# ============================================
+# 锁文件（可选：如果希望锁定依赖版本，可以保留 pubspec.lock）
+# pubspec.lock
+
+# 平台特定的构建产物
+/ios/Pods/
+/ios/.symlinks/
+/macos/Pods/
+/macos/.symlinks/
+/linux/flutter/ephemeral/
+/windows/flutter/ephemeral/
+/web/flutter/ephemeral/
+
+# Android 特定
+/android/.gradle/
+/android/key.properties
+/android/local.properties
+/android/app/src/main/jniLibs/
+
+# iOS/macOS 特定
+/ios/Flutter/App.framework
+/ios/Flutter/Flutter.framework
+/ios/ServiceDefinitions.json
+/ios/Runner/GeneratedPluginRegistrant.*
+/macos/Flutter/ephemeral/
+
+# IDE 补充
+.vscode/settings.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# 测试相关
+/test-results/
+coverage/
+.nyc_output/
+
+# 临时文件
+*.tmp
+*.temp
+.cache/
+temp/
+
+# 操作系统文件
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# 其他
+*.orig
+*.rej
+*~
