@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <title>Agora 直播测试播放器</title>
+  <style>
+    body {
+      font-family: -apple-system, sans-serif;
+      padding: 20px;
+      background: #1a1a1a;
+      color: white;
+    }
+
+    #video-container {
+      width: 640px;
+      height: 480px;
+      background: #333;
+      margin: 20px 0;
+    }
+
+    input,
+    button {
+      padding: 10px;
+      margin: 5px;
+      font-size: 14px;
+    }
+
+    input {
+      width: 300px;
+    }
+
+    button {
+      background: #00b4ff;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #0095d6;
+    }
+
+    #logs {
+      background: #222;
+      padding: 15px;
+      margin-top: 20px;
+      height: 200px;
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: 12px;
+    }
+
+    .log-time {
+      color: #888;
+    }
+
+    .log-info {
+      color: #00b4ff;
+    }
+
+    .log-error {
+      color: #ff4444;
+    }
+
+    .log-success {
+      color: #4caf50;
+    }
+
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 10px;
+      margin-bottom: 10px;
+      font-size: 13px;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #888;
+      display: inline-block;
+    }
+
+    .status-dot.ok {
+      background: #4caf50;
+    }
+
+    .status-dot.error {
+      background: #ff4444;
+    }
+  </style>
+</head>
+
+<body>
+  <h2>🎥 Agora 直播测试播放器</h2>
+
+  <div>
+    <input type="text" id="appid" placeholder="App ID" value="5523e1ece1e84adb82c69c121b500a39">
+    <input type="text" id="channel" placeholder="频道名 (例如: live_me_123)" value="">
+    <input type="text" id="uid" placeholder="服务端返回UID" value="" readonly>
+  </div>
+  <div>
+    <input type="text" id="server" placeholder="Token 服务地址" value="">
+    <input type="text" id="token" placeholder="Token (点击按钮自动获取)" value="">
+    <button onclick="checkServerStatus()">检测服务</button>
+    <button onclick="fetchTokenAndJoin()">获取Token并加入</button>
+    <button onclick="joinChannel()">加入频道</button>
+    <button onclick="leaveChannel()">离开频道</button>
+  </div>
+  <div class="status-bar">
+    <span id="server-status-dot" class="status-dot"></span>
+    <span id="server-status-text">服务状态未检测</span>
+  </div>
+
+  <div id="video-container"></div>
+  <div id="logs"></div>
+
+  <!-- Agora Web SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/agora-rtc-sdk-ng@4.20.0/AgoraRTC_N-production.js"></script>
+
+  <script>
+    let client = null;
+    let remoteVideoTrack = null;
+    let joinedUid = null; // 服务端签发 Token 时绑定的 UID
+
+    // ==================== Token 服务地址配置 ====================
+    // 本地调试默认频道名：
+    // 如果还没有从 Flutter 主播端同步真实房间号，就先回退到这个频道，避免页面完全空白。
+    const fallbackChannelName = 'live_me_123';
+
+    // 默认公网地址。
+    // 正式环境请改成你自己的域名，例如 https://api.yourdomain.com
+    const defaultRemoteTokenServerBaseUrl = 'https://api.yourdomain.com';
+
+    // 统一清理结尾 `/`，避免后续接口地址出现双斜杠。
+    function normalizeBaseUrl(url) {
+      return (url || '').trim().replace(/\/+$/, '');
+    }
+
+    // 本地调试优先使用当前主机地址。
+    // 例如：
+    // 1. 你在本机打开 http://127.0.0.1/... ，这里就会自动指向 http://127.0.0.1:8080
+    // 2. 你在局域网里打开 http://192.168.1.18/... ，这里就会自动指向 http://192.168.1.18:8080
+    function getLocalDebugTokenServerBaseUrl() {
+      const host = window.location.hostname;
+      if (!host || host === 'localhost' || host === '127.0.0.1') {
+        return 'http://127.0.0.1:8080';
+      }
+      if (/^\d+\.\d+\.\d+\.\d+$/.test(host)) {
+        return `http://${host}:8080`;
+      }
+      return '';
+    }
+
+    // Token 服务地址优先级：
+    // 1. URL 参数 `?server=https://你的公网域名`
+    // 2. 浏览器本地缓存的地址
+    // 3. 当前主机对应的本地调试地址
+    // 4. 当前文件里的默认公网地址
+    function resolveTokenServerBaseUrl() {
+      const params = new URLSearchParams(window.location.search);
+      const queryServer = params.get('server');
+      if (queryServer && queryServer.trim()) {
+        const baseUrl = normalizeBaseUrl(queryServer);
+        window.localStorage.setItem('agora_token_server_base_url', baseUrl);
+        return baseUrl;
+      }
+
+      const savedServer = window.localStorage.getItem('agora_token_server_base_url');
+      if (savedServer && savedServer.trim()) {
+        return normalizeBaseUrl(savedServer);
+      }
+
+      const localDebugBaseUrl = getLocalDebugTokenServerBaseUrl();
+      if (localDebugBaseUrl) {
+        return normalizeBaseUrl(localDebugBaseUrl);
+      }
+
+      return normalizeBaseUrl(defaultRemoteTokenServerBaseUrl);
+    }
+
+    function getTokenServerBaseUrl() {
+      const input = document.getElementById('server');
+      const value = normalizeBaseUrl(input?.value || '');
+      return value || resolveTokenServerBaseUrl();
+    }
+
+    function log(msg, type = 'info') {
+      const time = new Date().toLocaleTimeString();
+      const logs = document.getElementById('logs');
+      const className = type === 'error' ? 'log-error' : type === 'success' ? 'log-success' : 'log-info';
+      logs.innerHTML += `<div><span class="log-time">[${time}]</span> <span class="${className}">${msg}</span></div>`;
+      logs.scrollTop = logs.scrollHeight;
+    }
+
+    function setServerStatus(ok, text) {
+      const dot = document.getElementById('server-status-dot');
+      const label = document.getElementById('server-status-text');
+      dot.classList.remove('ok', 'error');
+      dot.classList.add(ok ? 'ok' : 'error');
+      label.textContent = text;
+    }
+
+    function warnIfMixedContent(tokenServerBaseUrl) {
+      const pageProtocol = window.location.protocol;
+      if (pageProtocol === 'https:' && tokenServerBaseUrl.startsWith('http://')) {
+        log('当前网页是 HTTPS，但 Token 服务是 HTTP，浏览器可能会拦截该请求', 'error');
+      }
+    }
+
+    function initServerInput() {
+      const serverInput = document.getElementById('server');
+      const initialBaseUrl = resolveTokenServerBaseUrl();
+      serverInput.value = initialBaseUrl;
+      serverInput.addEventListener('change', () => {
+        const nextBaseUrl = normalizeBaseUrl(serverInput.value);
+        if (nextBaseUrl) {
+          window.localStorage.setItem('agora_token_server_base_url', nextBaseUrl);
+          log(`已切换 Token 服务: ${nextBaseUrl}`, 'success');
+          warnIfMixedContent(nextBaseUrl);
+          checkServerStatus();
+        }
+      });
+    }
+
+    async function checkServerStatus() {
+      const tokenServerBaseUrl = getTokenServerBaseUrl();
+      warnIfMixedContent(tokenServerBaseUrl);
+      setServerStatus(false, '正在检测服务...');
+      try {
+        const response = await fetch(`${tokenServerBaseUrl}/health`);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const result = await response.json();
+        setServerStatus(true, `服务正常: ${result.status || 'ok'}`);
+        log(`✅ Token 服务连通: ${tokenServerBaseUrl}`, 'success');
+        return true;
+      } catch (err) {
+        setServerStatus(false, `服务不可达: ${tokenServerBaseUrl}`);
+        log(`❌ Token 服务不可达: ${tokenServerBaseUrl}，原因: ${err.message}`, 'error');
+        return false;
+      }
+    }
+
+    // 页面启动时自动带入主播真实房间号：
+    // 1. 优先读取 URL 参数 ?channel=xxxx
+    // 2. 若未传，则请求服务端默认房间号接口
+    async function initDefaultChannel() {
+      const channelInput = document.getElementById('channel');
+      const tokenServerBaseUrl = getTokenServerBaseUrl();
+      const params = new URLSearchParams(window.location.search);
+      const queryChannel = params.get('channel');
+
+      if (queryChannel && queryChannel.trim()) {
+        channelInput.value = queryChannel.trim();
+        log(`已从 URL 自动填充房间号: ${channelInput.value}`, 'success');
+        return;
+      }
+
+      try {
+        warnIfMixedContent(tokenServerBaseUrl);
+        const response = await fetch(`${tokenServerBaseUrl}/api/v1/agora/default-room`);
+        const result = await response.json();
+        if (result.code === 0 && result.data?.channelName) {
+          channelInput.value = result.data.channelName;
+          log(`已自动获取主播房间号: ${channelInput.value}`, 'success');
+        } else {
+          channelInput.value = fallbackChannelName;
+          log(`未获取到默认主播房间号，已回退到默认频道: ${fallbackChannelName}`, 'error');
+        }
+      } catch (err) {
+        channelInput.value = fallbackChannelName;
+        log(`自动获取房间号失败: ${err.message}`, 'error');
+        log(`已回退到默认频道: ${fallbackChannelName}，请确认 Token 服务 ${tokenServerBaseUrl} 已启动`, 'error');
+      }
+    }
+
+    // 自动获取 Token 并加入频道
+    async function fetchTokenAndJoin() {
+      const tokenServerBaseUrl = getTokenServerBaseUrl();
+      const channel = document.getElementById('channel').value;
+      if (!channel) {
+        log('请输入频道名', 'error');
+        return;
+      }
+
+      try {
+        const ok = await checkServerStatus();
+        if (!ok) return;
+        log('正在获取 Token...');
+        // 调用你的 Token 服务
+        const response = await fetch(`${tokenServerBaseUrl}/api/v1/agora/token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            channelName: channel,
+            uid: 'web_' + Date.now(),
+            role: 'subscriber',
+            expireMinutes: 60
+          })
+        });
+
+        const result = await response.json();
+        if (result.code === 0) {
+          document.getElementById('token').value = result.data.token;
+          document.getElementById('uid').value = result.data.uid;
+          joinedUid = Number(result.data.uid);
+          log(`✅ Token 获取成功 uid=${result.data.uid}`);
+          // 使用获取到的 Token 加入频道
+          await joinChannel();
+        } else {
+          log(`❌ Token 获取失败: ${result.message}`, 'error');
+        }
+      } catch (err) {
+        log(`❌ 获取 Token 错误: ${err.message}`, 'error');
+      }
+    }
+
+    async function joinChannel() {
+      const appId = document.getElementById('appid').value;
+      const channel = document.getElementById('channel').value;
+      const token = document.getElementById('token').value || null;
+      const uid = joinedUid;
+
+      if (!appId || !channel) {
+        log('请输入 App ID 和频道名', 'error');
+        return;
+      }
+
+      if (!token) {
+        log('⚠️ Token 为空，但项目已开启 Token 鉴权。请使用"获取Token并加入"按钮', 'error');
+        return;
+      }
+      if (uid == null || Number.isNaN(uid)) {
+        log('⚠️ UID 为空，请先点击"获取Token并加入"以使用服务端签发的 UID', 'error');
+        return;
+      }
+
+      try {
+        if (client) {
+          await leaveChannel();
+        }
+        log(`正在连接频道: ${channel}...`);
+
+        // 创建客户端实例（使用 Web 端的低延迟配置）
+        client = AgoraRTC.createClient({ mode: 'live', codec: 'vp8' });
+
+        let streamTimeout;
+        let hasReceivedStream = false;
+
+        // 监听连接状态变化
+        client.on('connection-state-change', (curState, prevState) => {
+          log(`连接状态: ${prevState} -> ${curState}`);
+        });
+
+        // 监听远端用户发布
+        client.on('user-published', async (user, mediaType) => {
+          log(`远端用户 ${user.uid} 发布了 ${mediaType}`, 'success');
+          hasReceivedStream = true;
+          clearTimeout(streamTimeout);
+
+          try {
+            await client.subscribe(user, mediaType);
+
+            if (mediaType === 'video') {
+              remoteVideoTrack = user.videoTrack;
+              remoteVideoTrack.play('video-container');
+              log('✅ 视频播放开始', 'success');
+            }
+            if (mediaType === 'audio') {
+              user.audioTrack?.play();
+            }
+          } catch (err) {
+            log(`订阅失败: ${err.message}`, 'error');
+          }
+        });
+
+        client.on('user-unpublished', (user, mediaType) => {
+          log(`远端用户 ${user.uid} 停止发布 ${mediaType}`);
+        });
+
+        // 加入频道（观众角色）
+        // 注意：Token 与 UID 必须一一对应，不能传 null 或随机 UID
+        await client.join(appId, channel, token, uid);
+        log(`✅ 加入频道成功(uid=${uid})，等待主播推流...`, 'success');
+
+        // ⚡ 关键：设置 5 秒超时，如果没有收到流则提示用户
+        streamTimeout = setTimeout(() => {
+          if (!hasReceivedStream) {
+            log('⏱️ 等待超时：5秒内未检测到主播流，可能原因：\n1. 主播尚未开始推流\n2. 网络延迟较高\n3. 防火墙阻挡 UDP 端口', 'warning');
+          }
+        }, 5000);
+
+      } catch (err) {
+        log(`❌ 错误: ${err.message}`, 'error');
+        console.error(err);
+      }
+    }
+
+    async function leaveChannel() {
+      if (client) {
+        await client.leave();
+        client = null;
+        log('已离开频道');
+        document.getElementById('video-container').innerHTML = '';
+      }
+    }
+
+    initServerInput();
+    log(`🚀 播放器就绪，当前 Token 服务: ${getTokenServerBaseUrl()}`);
+    log('正在尝试自动获取主播房间号...');
+    checkServerStatus();
+    initDefaultChannel();
+  </script>
+</body>
+
+</html>

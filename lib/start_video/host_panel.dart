@@ -4,10 +4,9 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
-import 'package:video_live_stream/live_stream_discover/live_streaming_starts/logic_layer_data/logic_layer.dart';
 import 'package:video_live_stream/start_video/beauty.dart';
 import 'package:video_live_stream/live_stream_discover/live_streaming_starts/shiping_UI/video_shiping.dart';
-import 'package:video_live_stream/start_video/logic/stream_service.dart';
+import 'package:video_live_stream/start_video/logic/agora_service.dart';
 import 'package:video_live_stream/start_video/maxim.dart';
 
 final isPanelExpandedProvider = StateProvider<bool>((ref) => false);
@@ -30,8 +29,9 @@ class _CameraActionControls extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final starsState = ref.watch(stars);
     final isNot = ref.watch(isPanelExpandedProvider);
-    final notifier = ref.watch(livePublisherProvider(roomID).notifier);
-    final isMicEnabled = ref.watch(isMicOpenProvider);
+    final notifier = ref.watch(agoraHostServiceProvider(roomID).notifier);
+    // Agora 麦克风状态从 notifier 获取
+    final isMicEnabled = !notifier.isMicrophoneMuted;
 
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -68,15 +68,17 @@ class _CameraActionControls extends ConsumerWidget {
                 },
               ),
               if (isNot) ...[
-                // 麦克风控制 — 通过 WebRTC track
+                // 麦克风控制 — 通过 Agora SDK
                 const SizedBox(height: 7),
                 _PanelIconButton(
                   icon: isMicEnabled
                       ? CupertinoIcons.mic_fill
                       : CupertinoIcons.mic_slash_fill,
                   color: isMicEnabled ? Colors.white : Colors.redAccent,
-                  onTap: () {
-                    notifier.toggleMic();
+                  onTap: () async {
+                    await notifier.toggleMicrophone();
+                    // 强制刷新 UI
+                    ref.invalidate(agoraHostServiceProvider(roomID));
                   },
                 ),
                 // 美颜控制
@@ -87,11 +89,13 @@ class _CameraActionControls extends ConsumerWidget {
                   onTap: () => _showBeautyPanel(context),
                 ),
                 const SizedBox(height: 7),
-                // 切换摄像头 — 通过 WebRTC Helper.switchCamera
+                // 切换摄像头 — 通过 Agora SDK
                 _PanelIconButton(
                   icon: CupertinoIcons.camera_viewfinder,
                   color: Colors.white,
-                  onTap: () => notifier.switchCamera(),
+                  onTap: () async {
+                    await notifier.switchCamera();
+                  },
                 ),
               ],
             ],

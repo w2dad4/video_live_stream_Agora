@@ -100,8 +100,7 @@ class VideoCardState extends State<VideoCard> {
         await _controller?.setLooping(true);
         _controller?.play();
       }
-    } catch (e) {
-    }
+    } catch (e) {}
   }
 
   // 纯粹的资源清理逻辑（不含任何 setState）

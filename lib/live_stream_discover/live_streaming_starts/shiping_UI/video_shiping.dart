@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
+import 'package:video_live_stream/config/constants.dart';
 import 'package:go_router/go_router.dart';
 import 'package:video_live_stream/live_stream_My/meProvider_data/meProvider.dart';
 import 'package:video_live_stream/live_stream_discover/live_streaming_starts/logic_layer_data/beauty_provider.dart';
@@ -11,6 +12,7 @@ import 'package:video_live_stream/live_stream_discover/select_Album/dialogbox.da
 import 'package:video_live_stream/live_stream_discover/select_Album/select_Album.dart';
 import 'package:video_live_stream/live_stream_discover/live_streaming_starts/shiping_UI/preview.dart';
 import 'package:video_live_stream/start_video/beauty.dart';
+import 'package:video_live_stream/start_video/logic/agora_token_service.dart';
 
 //直播预览
 final stars = StateProvider<bool>((ref) => false); // 美颜状态，默认为关闭
@@ -208,10 +210,10 @@ class StartVideo extends ConsumerWidget {
                 region: region,
               );
           if (!context.mounted) return;
-          // 跳转到直播间
+          // 跳转到直播间，并标记自动开播
           context.pushNamed(
             'StartVideo',
-            extra: {"id": liveId, 'isHost': true},
+            extra: {"id": liveId, 'isHost': true, 'autoStart': true},
           );
         }
       },

@@ -106,9 +106,9 @@ export 'start_video/live_video_view.dart';
 export 'start_video/maxim.dart';
 export 'start_video/room_manager_logic.dart';
 export 'start_video/showUserActionMenu.dart';
-export 'start_video/logic/stream_player_service.dart';
-export 'start_video/logic/stream_service.dart';
+export 'start_video/logic/agora_service.dart';
+export 'start_video/logic/agora_token_service.dart';
 export 'start_video/logic/music/music_main.dart';
 
 // ==================== End ====================
-export 'over_video/end.dart';
+export 'start_video/over_video/end.dart';

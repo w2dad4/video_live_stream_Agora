@@ -2,14 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:video_live_stream/live_stream_discover/live_streaming_starts/logic_layer_data/logic_layer.dart';
-import 'package:video_live_stream/start_video/beauty.dart';
-import 'package:video_live_stream/start_video/logic/music/music_main.dart';
-import 'package:video_live_stream/start_video/logic/stream_service.dart';
-import 'package:video_live_stream/start_video/maxim.dart';
-import 'package:video_live_stream/start_video/room_manager_logic.dart';
-import 'package:video_live_stream/tool/dataTime.dart';
-import 'package:video_live_stream/utility/dialogbox.dart'; // 禁言管理
+import 'package:video_live_stream/library.dart';
 
 //主播内容
 class BottomActionBar extends ConsumerWidget {
@@ -60,11 +53,10 @@ class BuildHostMenu extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isMicEnabled = ref.watch(isMicOpenProvider);
-    final notifier = ref.read(livePublisherProvider(roomID).notifier);
+    final notifier = ref.read(agoraHostServiceProvider(roomID).notifier);
+    final isMicEnabled = !notifier.isMicrophoneMuted;
     final isRecording = ref.watch(isRecordingProvider); //用于控制录播颜色
     final currentQuality = ref.watch(currentQualityProvider);
-
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -83,12 +75,10 @@ class BuildHostMenu extends ConsumerWidget {
             //摄像头反转
             _menuItem(CupertinoIcons.camera_rotate, '翻转', () => notifier.switchCamera()),
             //静音
-            _menuItem(
-              isMicEnabled ? CupertinoIcons.mic_fill : CupertinoIcons.mic_slash_fill,
-              isMicEnabled ? '已开麦' : '已静音', //
-              () => notifier.toggleMic(),
-              color: isMicEnabled ? Colors.white : Colors.redAccent,
-            ),
+            _menuItem(isMicEnabled ? CupertinoIcons.mic_fill : CupertinoIcons.mic_slash_fill, isMicEnabled ? '已开麦' : '已静音', () async {
+              await notifier.toggleMicrophone();
+              // 不需要 invalidate，麦克风状态通过 isMicrophoneMuted 实时获取
+            }, color: isMicEnabled ? Colors.white : Colors.redAccent),
             //美颜
             _menuItem(CupertinoIcons.wand_stars, '美颜', () {
               context.pop(); // 先关底部菜单
@@ -183,7 +173,7 @@ class BuildHostMenu extends ConsumerWidget {
       options: LiveQuality.values,
       getlabel: (quality) => quality.name,
       onSelected: (quality) {
-        ref.read(livePublisherProvider(roomID).notifier).changeQuality(quality);
+        ref.read(agoraHostServiceProvider(roomID).notifier).changeQuality(quality);
       },
     );
   }

@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:geolocator/geolocator.dart';
 // 假设这是你的数据模型路径
-import 'package:video_live_stream/live_stream_homePage/discover_page/discover_page.dart';
+import 'package:video_live_stream/library.dart';
 
 // --- 使用 Riverpod 定义状态模型 ---
 class AnchorState {

@@ -10,6 +10,7 @@ import 'package:video_live_stream/start_video/audience_video_view.dart';
 import 'package:video_live_stream/start_video/chat_view.dart';
 import 'package:video_live_stream/start_video/live_video_view.dart';
 import 'package:video_live_stream/start_video/room_manager_logic.dart';
+import 'package:video_live_stream/start_video/logic/agora_service.dart';
 
 //定义消息模型
 class ChatsMessage {
@@ -23,8 +24,9 @@ class ChatsMessage {
 class StartVideoPage extends HookConsumerWidget {
   final String isHost; // 通过 GoRouter 路由参数判断：是主播开播还是观众进入
   final String liveID;
+  final bool autoStart; // 是否自动开播（从预览页进入时为true）
 
-  const StartVideoPage({super.key, required this.liveID, required this.isHost});
+  const StartVideoPage({super.key, required this.liveID, required this.isHost, this.autoStart = false});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -45,7 +47,19 @@ class StartVideoPage extends HookConsumerWidget {
         if (context.mounted) context.pop(); // GoRouter 路由返回
       }
     });
-    //4. 计时器逻辑 如果是主播，进入页面即开始计时
+    // 4. 自动开播逻辑（从预览页进入时）
+    useEffect(() {
+      if (hostMode && autoStart) {
+        // 延迟一点等待引擎初始化完成
+        Future.delayed(const Duration(milliseconds: 500), () async {
+          final notifier = ref.read(agoraHostServiceProvider(currentRoomID).notifier);
+          await notifier.startPublishing();
+        });
+      }
+      return null;
+    }, [autoStart, hostMode, currentRoomID]);
+
+    //5. 计时器逻辑 如果是主播，进入页面即开始计时
     useEffect(() {
       if (!hostMode) return null;
       final timer = Timer.periodic(const Duration(seconds: 1), (t) {
@@ -88,8 +102,8 @@ class StartVideoPage extends HookConsumerWidget {
         backgroundColor: Colors.black,
         body: Stack(
           children: [
-            // 1. 核心渲染层：WebRTC 预览 (完全独立，不参与 UI 层重绘)
-            hostMode ? (hostCameraReady.value ? LiveWebRTCPreview(roomID: currentRoomID) : const _PreparingCameraView()) : AudienceInteractionPanel(audienceID: currentRoomID),
+            // 1. 核心渲染层：Agora 预览 (完全独立，不参与 UI 层重绘)
+            hostMode ? (hostCameraReady.value ? LiveAgoraPreview(roomID: currentRoomID) : const _PreparingCameraView()) : AudienceInteractionPanel(audienceID: currentRoomID),
             // 2. 交互层UI：添加平滑的透明度动画
             AnimatedOpacity(
               opacity: isCleanMode ? 0.0 : 1.0,
@@ -104,6 +118,32 @@ class StartVideoPage extends HookConsumerWidget {
                       left: 20,
                       child: LiveRoomComponents(info: liveInfo),
                     ),
+                    // 直播状态指示器（主播模式显示）
+                    if (hostMode)
+                      Positioned(
+                        bottom: 120,
+                        left: 50,
+                        right: 50,
+                        child: Consumer(
+                          builder: (context, ref, child) {
+                            final isPublishing = ref.watch(isPublishingProvider);
+                            final agoraService = ref.watch(agoraHostServiceProvider(currentRoomID));
+                            return agoraService.when(
+                              data: (_) => isPublishing ? const SizedBox.shrink() : const SizedBox.shrink(),
+                              loading: () => const Center(child: CircularProgressIndicator(color: Colors.white)),
+                              error: (_, _) => ElevatedButton.icon(
+                                onPressed: () async {
+                                  final notifier = ref.read(agoraHostServiceProvider(currentRoomID).notifier);
+                                  await notifier.retryPublishing();
+                                },
+                                icon: const Icon(Icons.refresh, color: Colors.white),
+                                label: const Text('重新连接', style: TextStyle(color: Colors.white)),
+                                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
                     // 聊天区域
                     Positioned(
                       bottom: 0,
