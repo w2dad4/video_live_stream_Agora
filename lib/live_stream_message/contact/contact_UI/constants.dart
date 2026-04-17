@@ -9,6 +9,7 @@ class LiveConfig {
   static const String _serverFromDefine = String.fromEnvironment('LIVE_SERVER_IP', defaultValue: '');
   static const int apiPort = 1985;
   static const int hlsPort = 8080;
+  static const int unifiedPort = 8080; // 统一服务器端口（WebSocket、HTTP API）
   static const String appName = 'live';
 
   static String get serverIP {

@@ -22,8 +22,8 @@ class ContactPage extends ConsumerWidget {
       data: (contacs) {
         // 统计群聊入口：只计算「我加入的群」
         final me = ref.watch(meProvider);
-        final myId = me.uid?.trim().isNotEmpty == true
-            ? me.uid!.trim()
+        final myId = me?.uid?.trim().isNotEmpty == true
+            ? me!.uid!.trim()
             : 'self';
         final groupMetas = ref.watch(groupChatListProvider).value ?? const [];
         final joinedGroupIds = groupMetas

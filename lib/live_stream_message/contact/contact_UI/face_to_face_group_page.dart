@@ -36,7 +36,7 @@ class _FaceToFaceGroupPageState extends ConsumerState<FaceToFaceGroupPage> {
       return;
     }
     final me = ref.read(meProvider);
-    final myId = me.uid?.trim().isNotEmpty == true ? me.uid!.trim() : 'self';
+    final myId = me?.uid?.trim().isNotEmpty == true ? me!.uid!.trim() : 'self';
     var groupId = await SocialLocalStorage.getFaceToFaceGroupId(digits);
     if (groupId == null || groupId.isEmpty) {
       groupId = 'group_f2f_$digits';

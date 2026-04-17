@@ -52,6 +52,7 @@ class MessageNotifier extends AsyncNotifier<List<MessageModel>> {
     final repo = ref.read(chatRepositoryProvider);
     final detail = ref.read(chatDetailProvider(roomId));
     final me = ref.read(meProvider);
+    if (me == null) return;
     final isSelf = me.uid == roomId;
     // 1. 创建唯一的消息实体（包含时间戳）
     final tempMsg = MessageModel(

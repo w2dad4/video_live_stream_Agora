@@ -8,8 +8,8 @@ import 'package:video_live_stream/live_stream_My/mePage_UI/apply_Page.dart';
 import 'package:video_live_stream/live_stream_My/meProvider_data/meProvider.dart';
 import 'package:video_live_stream/tool/region.dart';
 
-class MyvideoPage extends ConsumerWidget {
-  const MyvideoPage({super.key});
+class MyVideoPage extends ConsumerWidget {
+  const MyVideoPage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -30,14 +30,14 @@ class MyvideoPage extends ConsumerWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildImage(me.avatar), //将头像地址传入
+              _buildImage(me?.avatar), //将头像地址传入
               Padding(
                 padding: EdgeInsets.only(left: 10),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text("昵称: ${me.name}", style: TextStyle(fontSize: 15)), //昵称
-                    Text("UID: ${me.uid}", style: TextStyle(fontSize: 15)), //UID
+                    Text("昵称: ${me?.name ?? '未设置'}", style: TextStyle(fontSize: 15)), //昵称
+                    Text("UID: ${me?.uid ?? 'unknown'}", style: TextStyle(fontSize: 15)), //UID
                     locationAsync.when(
                       data: (area) => Text('IP:$area', style: TextStyle(fontSize: 15)), //ip地址
                       loading: () => Text('正在获取位置...', style: TextStyle(fontSize: 15)),

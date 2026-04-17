@@ -11,18 +11,7 @@ class VideoIndex {
     ];
   });
 
-  static List<Map<String, dynamic>> contentsindex = [
-    {"id": "1", "icon": "assets/image/002.png", "title": "首页", 'region': '广东'},
-    {"id": "2", "icon": "assets/image/003.png", "title": "搜索", 'region': '上海'},
-    {"id": "3", "icon": "assets/image/004.jpeg", "title": "收藏", 'region': '北京'},
-    {"id": "4", "icon": "assets/image/005.jpeg", "title": "我的", 'region': '东北'},
-    {"id": "5", "icon": "assets/image/006.png", "title": "设置", 'region': '四川'},
-    {"id": "6", "icon": "assets/image/007.jpeg", "title": "通知", 'region': '河南'},
-    {"id": "7", "icon": "assets/image/008.jpeg", "title": "消息", 'region': '安徽'},
-    {"id": "8", "icon": "assets/image/009.jpeg", "title": "精选", 'region': '济南'},
-    {"id": "9", "icon": "assets/image/010.jpeg", "title": "购物车", 'region': '齐齐哈尔'},
-    {"id": "10", "icon": "assets/image/004.jpeg", "title": "电话", 'region': '江西'},
-  ];
+  static List<Map<String, dynamic>> contentsindex = [];
 
   final List<Map<String, dynamic>> videocontext = [
     {'video': 'assets/image/video_demo'},

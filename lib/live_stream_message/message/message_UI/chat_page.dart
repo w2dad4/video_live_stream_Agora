@@ -51,15 +51,15 @@ class ChatPageState extends ConsumerState<ChatPage> {
             .markGroupAsRead(widget.chatId);
       });
     }
-    final isSelfChat = me.uid == widget.chatId;
+    final isSelfChat = me?.uid == widget.chatId;
     final targetTitle =
         group?.groupName ??
         info?.title ??
-        (isSelfChat ? (me.name ?? '我') : '用户${widget.chatId}');
+        (isSelfChat ? (me?.name ?? '我') : '用户${widget.chatId}');
     final targetAvatar =
         info?.iconUrl ??
         (isSelfChat
-            ? (me.avatar ?? 'assets/image/002.png')
+            ? (me?.avatar ?? 'assets/image/002.png')
             : 'assets/image/002.png');
     final targetBg = info?.bgUrl ?? 'assets/image/010.jpeg';
 
@@ -132,7 +132,7 @@ class ChatPageState extends ConsumerState<ChatPage> {
                     return _MessageBubble(
                       message: message[index], // 传入消息数据
                       avatar: targetAvatar,
-                      myAvatar: me.avatar,
+                      myAvatar: me?.avatar,
                     );
                   },
                 ),

@@ -18,10 +18,13 @@ export 'tool/index.dart';
 
 // ==================== Config ====================
 export 'config/constants.dart';
-export 'config/login_provider.dart';
-export 'config/login_UI.dart';
+export 'config/login/login_provider.dart';
+export 'config/login/login_UI.dart';
+export 'config/login/pop-up_guide.dart';
 export 'config/toppop-up.dart';
 export 'config/app_config.dart';
+export 'package:video_live_stream/config/login/number_login.dart';
+export 'package:video_live_stream/start_video/over_video/conclude.dart';
 
 // ==================== Home ====================
 export 'live_stream_homePage/myHomeTab.dart';
@@ -106,9 +109,16 @@ export 'start_video/live_video_view.dart';
 export 'start_video/maxim.dart';
 export 'start_video/room_manager_logic.dart';
 export 'start_video/showUserActionMenu.dart';
-export 'start_video/logic/agora_service.dart';
+export 'start_video/logic/agora_service.dart'; // ⚠️ 迁移完成后删除
 export 'start_video/logic/agora_token_service.dart';
 export 'start_video/logic/music/music_main.dart';
 
+// ==================== Features (New) ====================
+// 🎤 主播端服务（新结构）
+export 'features/anchor/logic/index.dart';
+export 'features/anchor/ui/anchor_page.dart';
+// 👀 观众端服务（新结构）
+export 'features/audience/logic/index.dart';
+export 'features/audience/ui/audience_page.dart';
 // ==================== End ====================
 export 'start_video/over_video/end.dart';

@@ -21,7 +21,7 @@ class _GroupInfoPageState extends ConsumerState<GroupInfoPage> {
     final group = ref.watch(groupDetailProvider(widget.groupId));
     final contact = ref.watch(chatDetailProvider(widget.groupId));
     final me = ref.watch(meProvider);
-    final myId = me.uid?.trim().isNotEmpty == true ? me.uid!.trim() : 'self';
+    final myId = me?.uid?.trim().isNotEmpty == true ? me!.uid!.trim() : 'self';
 
     if (group == null) {
       if (!_ensuredOnce && contact != null && contact.tag == '群聊') {

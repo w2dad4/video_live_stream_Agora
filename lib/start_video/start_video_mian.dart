@@ -5,12 +5,11 @@ import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:video_live_stream/live_stream_My/meProvider_data/meProvider.dart';
-import 'package:video_live_stream/live_stream_discover/live_streaming_starts/logic_layer_data/logic_layer.dart';
 import 'package:video_live_stream/start_video/audience_video_view.dart';
 import 'package:video_live_stream/start_video/chat_view.dart';
 import 'package:video_live_stream/start_video/live_video_view.dart';
 import 'package:video_live_stream/start_video/room_manager_logic.dart';
-import 'package:video_live_stream/start_video/logic/agora_service.dart';
+import 'package:video_live_stream/features/anchor/logic/index.dart';
 
 //定义消息模型
 class ChatsMessage {
@@ -41,8 +40,10 @@ class StartVideoPage extends HookConsumerWidget {
 
     // 3. 监听踢出名单：如果当前用户 UID 在踢出名单中，GoRouter 强制弹回上一页
     ref.listen(kickedUsersProvider, (previous, next) {
-      final myUid = ref.read(meProvider).uid;
-      if (next.contains(myUid)) {
+      final me = ref.read(meProvider);
+      if (me == null) return;
+      final myUid = me.uid;
+      if (myUid != null && next.contains(myUid)) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('您已被管理员移出该房间内')));
         if (context.mounted) context.pop(); // GoRouter 路由返回
       }
@@ -52,7 +53,7 @@ class StartVideoPage extends HookConsumerWidget {
       if (hostMode && autoStart) {
         // 延迟一点等待引擎初始化完成
         Future.delayed(const Duration(milliseconds: 500), () async {
-          final notifier = ref.read(agoraHostServiceProvider(currentRoomID).notifier);
+          final notifier = ref.read(anchorServiceProvider(currentRoomID).notifier);
           await notifier.startPublishing();
         });
       }
@@ -68,13 +69,11 @@ class StartVideoPage extends HookConsumerWidget {
       return () => timer.cancel(); //退出直播间自动销毁计时器
     }, []);
 
-    // 进入直播间前先确保 camera 插件完全释放，避免和 WebRTC 抢占相机
+    // 进入直播间前确保资源就绪
     useEffect(() {
       if (!hostMode) return null;
       var cancelled = false;
       Future<void>(() async {
-        ref.read(previewCameraActiveProvider.notifier).state = false;
-        await ref.read(cameraStateProvider.notifier).releaseCamera();
         await Future<void>.delayed(const Duration(milliseconds: 200));
         if (!cancelled) {
           hostCameraReady.value = true;
@@ -116,7 +115,7 @@ class StartVideoPage extends HookConsumerWidget {
                     Positioned(
                       top: MediaQuery.of(context).padding.top + 10,
                       left: 20,
-                      child: LiveRoomComponents(info: liveInfo),
+                      child: LiveRoomComponents(info: liveInfo, isHost: hostMode),
                     ),
                     // 直播状态指示器（主播模式显示）
                     if (hostMode)
@@ -126,14 +125,14 @@ class StartVideoPage extends HookConsumerWidget {
                         right: 50,
                         child: Consumer(
                           builder: (context, ref, child) {
-                            final isPublishing = ref.watch(isPublishingProvider);
-                            final agoraService = ref.watch(agoraHostServiceProvider(currentRoomID));
-                            return agoraService.when(
+                            final isPublishing = ref.watch(anchorPublishingProvider);
+                            final anchorService = ref.watch(anchorServiceProvider(currentRoomID));
+                            return anchorService.when(
                               data: (_) => isPublishing ? const SizedBox.shrink() : const SizedBox.shrink(),
                               loading: () => const Center(child: CircularProgressIndicator(color: Colors.white)),
                               error: (_, _) => ElevatedButton.icon(
                                 onPressed: () async {
-                                  final notifier = ref.read(agoraHostServiceProvider(currentRoomID).notifier);
+                                  final notifier = ref.read(anchorServiceProvider(currentRoomID).notifier);
                                   await notifier.retryPublishing();
                                 },
                                 icon: const Icon(Icons.refresh, color: Colors.white),
@@ -160,21 +159,22 @@ class StartVideoPage extends HookConsumerWidget {
                           // 点击按钮时弹出对话框
                           final bool? shouldExit = await _showExitConfirmDialog(context);
                           if (shouldExit == true && context.mounted) {
-                            // 🟢 核心逻辑：当前时间 减去 已经直播的秒数 = 开播时刻
-                            final int intsecondsPlayed = ref.read(liveSecondsProvider);
-                            final DateTime startMoment = DateTime.now().subtract(Duration(seconds: intsecondsPlayed));
                             if (hostMode) {
+                              // 🟢 主播：跳转到结束页面
+                              final int intsecondsPlayed = ref.read(liveSecondsProvider);
+                              final DateTime startMoment = DateTime.now().subtract(Duration(seconds: intsecondsPlayed));
                               ref.read(liverecommendProvider.notifier).stop(currentRoomID);
+                              context.pushNamed(
+                                'End',
+                                extra: {
+                                  'id': currentRoomID,
+                                  'startTime': startMoment,
+                                },
+                              );
+                            } else {
+                              // 👀 观众：直接返回列表页
+                              context.pop();
                             }
-                            // 只有点击“确认退出”，才执行真正的路由跳转
-                            context.pushNamed(
-                              'End',
-                              extra: {
-                                'id': currentRoomID,
-                                //把计算好的当前时间传递给子页面
-                                'startTime': startMoment,
-                              },
-                            );
                           }
                         },
                         child: Icon(Icons.adjust, color: const Color.fromARGB(255, 170, 37, 37)),

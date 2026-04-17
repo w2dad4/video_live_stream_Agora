@@ -4,8 +4,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:video_live_stream/live_stream_My/meProvider_data/meProvider.dart';
-import 'package:video_live_stream/live_stream_discover/select_Album/dialogbox.dart';
+import 'package:video_live_stream/features/auth/auth_provider.dart';
+import 'package:video_live_stream/library.dart';
 
 class SelectAlbum extends ConsumerWidget {
   final LiveMode mode;
@@ -37,13 +37,13 @@ class SelectAlbum extends ConsumerWidget {
                 onTap: () => Dialogbox.show(context, mode),
                 child: Row(
                   children: [
-                    Text("${me.name}正在直播", style: TextStyle(fontSize: 18)), //
+                    Text("${me?.name ?? '主播'}正在直播", style: TextStyle(fontSize: 18, color: Colors.white)), //
                     SizedBox(width: 3),
                     Icon(CupertinoIcons.paperplane, size: 20),
                   ],
                 ),
               ),
-              Container(margin: EdgeInsets.symmetric(vertical: 5), width: 200, height: 1, color: Colors.black),
+              Container(margin: EdgeInsets.symmetric(vertical: 5), width: 200, height: 1, color: Colors.white),
               Row(
                 children: [
                   GestureDetector(
@@ -53,12 +53,12 @@ class SelectAlbum extends ConsumerWidget {
                     },
                     child: Row(
                       children: [
-                        Text(orientation, style: TextStyle(fontSize: 15, color: Colors.black)),
-                        Icon(CupertinoIcons.chevron_right, size: 18),
+                        Text(orientation, style: TextStyle(fontSize: 15, color: Colors.white)),
+                        Icon(CupertinoIcons.chevron_right, size: 18, color: Colors.white),
                       ],
                     ),
                   ),
-                  Container(margin: EdgeInsets.symmetric(horizontal: 10), width: 1, height: 20, color: Colors.black),
+                  Container(margin: EdgeInsets.symmetric(horizontal: 10), width: 1, height: 20, color: Colors.white),
                   GestureDetector(
                     onTap: () {
                       print('点击了所有人可见');
@@ -66,8 +66,8 @@ class SelectAlbum extends ConsumerWidget {
                     },
                     child: Row(
                       children: [
-                        Text(evident, style: TextStyle(fontSize: 15)),
-                        Icon(CupertinoIcons.chevron_right, size: 18),
+                        Text(evident, style: TextStyle(fontSize: 15, color: Colors.white)),
+                        Icon(CupertinoIcons.chevron_right, size: 18, color: Colors.white),
                       ],
                     ),
                   ),
@@ -84,7 +84,7 @@ class SelectAlbum extends ConsumerWidget {
   Widget _buildImage(BuildContext context, WidgetRef ref) {
     //监听meProvider里的信息
     final my = ref.watch(meProvider);
-    final avatarPath = my.avatar;
+    final avatarPath = my?.avatar;
     // 插入直播（封面图等）
     return GestureDetector(
       onTap: () async => await _pickImageFromGallery(context, ref),
@@ -108,7 +108,16 @@ class SelectAlbum extends ConsumerWidget {
       final XFile? image = await picker.pickImage(source: ImageSource.gallery, maxWidth: 1024, imageQuality: 80);
       if (image != null) {
         print('用户选择了:${image.path}');
-        ref.read(meProvider.notifier).update((state) => state.copyWith(avatar: image.path));
+        // 更新当前用户的头像
+        final currentUserId = ref.read(currentUserIdProvider);
+        if (currentUserId != null) {
+          final currentData = ref.read(userDataProvider(currentUserId));
+          if (currentData != null) {
+            ref.read(userDataProvider(currentUserId).notifier).updateUserData(
+              currentData.copyWith(avatar: image.path),
+            );
+          }
+        }
       }
     } catch (e) {
       print('选择图片时发生的错误');

@@ -32,7 +32,7 @@ class _GroupChatHubPageState extends ConsumerState<GroupChatHubPage> {
   @override
   Widget build(BuildContext context) {
     final me = ref.watch(meProvider);
-    final myId = me.uid?.trim().isNotEmpty == true ? me.uid!.trim() : 'self';
+    final myId = me?.uid?.trim().isNotEmpty == true ? me!.uid!.trim() : 'self';
     final contacts =
         ref.watch(contactListProvider).value ?? const <ContactModel>[];
     final groups = ref.watch(groupChatListProvider).value ?? const [];

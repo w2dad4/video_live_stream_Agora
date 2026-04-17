@@ -32,7 +32,7 @@ class ContactNotifier extends AsyncNotifier<List<ContactModel>> {
 
   // 删除联系人（持久化中同步删除，不含「自己」）
   Future<void> delete(String id) async {
-    final myId = ref.read(meProvider).uid ?? '';
+    final myId = ref.read(meProvider)?.uid ?? '';
     if (id == myId) {
       return;
     }
@@ -47,7 +47,8 @@ class ContactNotifier extends AsyncNotifier<List<ContactModel>> {
     }
   }
 
-  List<ContactModel> _withSelfContact(List<ContactModel> contacts, UserMe me) {
+  List<ContactModel> _withSelfContact(List<ContactModel> contacts, UserMe? me) {
+    if (me == null) return contacts;
     final myId = me.uid?.trim().isNotEmpty == true ? me.uid!.trim() : 'self';
     final selfContact = ContactModel(
       id: myId,

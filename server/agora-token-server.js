@@ -40,10 +40,9 @@ let currentDefaultHostChannel = DEFAULT_HOST_CHANNEL;
  *   expireMinutes?: number  // 可选，自定义过期时间
  * }
  */
-app.post('/api/v1/agora/token', (req, res) => {
+app.post('/token', (req, res) => {
   try {
     const { channelName, uid, role, expireMinutes } = req.body;
-
     // 参数校验
     if (!channelName || !uid || !role) {
       return res.status(400).json({
@@ -122,7 +121,7 @@ app.get('/health', (req, res) => {
 
 // ==================== 调试辅助接口 ====================
 // 用于浏览器测试页自动带出当前默认主播房间号
-app.get('/api/v1/agora/default-room', (req, res) => {
+app.get('/default-room', (req, res) => {
   res.json({
     code: 0,
     message: 'success',
@@ -135,7 +134,7 @@ app.get('/api/v1/agora/default-room', (req, res) => {
 // Flutter 主播端启动直播前调用：
 // 将“当前登录用户实际使用的直播间ID”同步到本地 token 服务，
 // 浏览器测试页随后读取这个值，就能自动填入真实房间号。
-app.post('/api/v1/agora/default-room', (req, res) => {
+app.post('/default-room', (req, res) => {
   try {
     const { channelName } = req.body;
 
@@ -167,7 +166,7 @@ app.post('/api/v1/agora/default-room', (req, res) => {
 
 // 主播停播后调用：
 // 清空默认房间号，避免浏览器测试页继续自动进入一个已经失效的频道。
-app.post('/api/v1/agora/default-room/clear', (req, res) => {
+app.post('/default-room/clear', (req, res) => {
   currentDefaultHostChannel = DEFAULT_HOST_CHANNEL;
   console.log(`[DefaultRoom] 已清空当前主播房间号，恢复默认频道: ${currentDefaultHostChannel}`);
 
@@ -181,14 +180,17 @@ app.post('/api/v1/agora/default-room/clear', (req, res) => {
 });
 
 // ==================== 启动服务 ====================
-const PORT = process.env.PORT || 8080;
-const HOST = '0.0.0.0'; // 绑定所有网卡，允许外部设备访问
-app.listen(PORT, HOST, () => {
-  console.log(`🚀 Agora Token Server running on http://${HOST}:${PORT}`);
-  console.log(`📡 Token endpoint: POST http://localhost:${PORT}/api/v1/agora/token`);
-  console.log(`🏠 Default room endpoint: GET http://localhost:${PORT}/api/v1/agora/default-room`);
-  console.log(`⏱️  Default expire time: ${TOKEN_EXPIRE_MINUTES} minutes`);
-  console.log(`🔒 App Certificate is ${AGORA_APP_CERTIFICATE === 'YOUR_APP_CERTIFICATE' ? 'NOT SET ⚠️' : 'SET ✓'}`);
-});
+// 只在直接运行此文件时启动服务器，被导入为模块时不启动
+if (require.main === module) {
+  const PORT = process.env.PORT || 8080;
+  const HOST = '0.0.0.0'; // 绑定所有网卡，允许外部设备访问
+  app.listen(PORT, HOST, () => {
+    console.log(`🚀 Agora Token Server running on http://${HOST}:${PORT}`);
+    console.log(`📡 Token endpoint: POST http://localhost:${PORT}/api/v1/agora/token`);
+    console.log(`🏠 Default room endpoint: GET http://localhost:${PORT}/api/v1/agora/default-room`);
+    console.log(`⏱️  Default expire time: ${TOKEN_EXPIRE_MINUTES} minutes`);
+    console.log(`🔒 App Certificate is ${AGORA_APP_CERTIFICATE === 'YOUR_APP_CERTIFICATE' ? 'NOT SET ⚠️' : 'SET ✓'}`);
+  });
+}
 
 module.exports = app;

@@ -1,13 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
-import 'package:video_live_stream/live_stream_My/myVideo.dart';
-import 'package:video_live_stream/live_stream_discover/onair_Page.dart';
-import 'package:video_live_stream/live_stream_homePage/myHomeTab.dart';
-import 'package:video_live_stream/live_stream_message/messagepage_main.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:video_live_stream/config/login_provider.dart';
-import 'package:video_live_stream/utility/toRoute.dart'; //这个需要手动导
+import 'package:video_live_stream/library.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -46,7 +40,7 @@ class MyMylivestreamState extends State<Mylivestream> {
     {'icon': Icons.home_outlined, 'active': Icons.home, 'label': '首页', 'page': const MyHomeTab()},
     {'icon': Icons.explore_outlined, 'active': Icons.explore, 'label': '消息', 'page': const VideoMessagePage()},
     {'icon': Icons.center_focus_weak, 'active': Icons.center_focus_strong, 'label': '开播', 'page': const OnairPage()},
-    {'icon': Icons.person_outlined, 'active': Icons.person, 'label': '我的', 'page': const MyvideoPage()},
+    {'icon': Icons.person_outlined, 'active': Icons.person, 'label': '我的', 'page': const MyVideoPage()},
   ];
 
   @override
@@ -57,7 +51,7 @@ class MyMylivestreamState extends State<Mylivestream> {
       // 使用 IndexedStack 可以保持页面状态（比如你在首页刷到一半，切到“我的”再回来，进度还在）
       body: Stack(
         children: [
-          IndexedStack(index: _currentIndex, children: const [MyHomeTab(), VideoMessagePage(), OnairPage(), MyvideoPage()]),
+          IndexedStack(index: _currentIndex, children: const [MyHomeTab(), VideoMessagePage(), OnairPage(), MyVideoPage()]),
         ],
       ),
       bottomNavigationBar: Padding(padding: EdgeInsets.fromLTRB(0, 0, 0, 0), child: _buildBottomNavigationBar()),

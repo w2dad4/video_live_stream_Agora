@@ -1,16 +1,26 @@
 // 模拟当前登录用户的信息
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
+import 'package:video_live_stream/features/auth/auth_provider.dart';
 import 'package:video_live_stream/live_stream_discover/select_Album/dialogbox.dart';
+import 'package:video_live_stream/services/live_room_service.dart';
 
-final meProvider = StateProvider<UserMe>(
-  (ref) => UserMe(
-    uid: 'me_123',
-    name: '杨咩咩',
-    avatar: 'assets/image/002.png', //
+/// 🔐 当前登录用户信息（带数据隔离）
+/// 返回 null 表示未登录
+final meProvider = Provider<UserMe?>((ref) {
+  final userData = ref.watch(currentUserDataProvider);
+  if (userData == null) return null;
+  
+  return UserMe(
+    uid: userData.uid,
+    name: userData.name,
+    avatar: userData.avatar ?? 'assets/image/002.png',
     ip: 'null',
-  ),
-); //注册用户的参数
+    gender: userData.gender,
+    region: userData.region,
+    signature: userData.signature,
+  );
+});
 
 class UserMe {
   final String? uid;
@@ -92,7 +102,33 @@ final liveDataProvider = Provider.family<LiveDataMode, String>((ref, liveID) {
   // 监听在准备页面设置的标题 (family 参数需要匹配，假设为 LiveMode.video)
   final title = ref.watch(liveTitleProvider(LiveMode.video));
   // 组合成直播间专用的模型
-  return LiveDataMode(liveID: liveID, title: title, hostName: me.name ?? "", hostAvarat: me.avatar ?? '', watchCount: 0);
+  return LiveDataMode(
+    liveID: liveID, 
+    title: title, 
+    hostName: me?.name ?? "", 
+    hostAvarat: me?.avatar ?? '', 
+    watchCount: 0
+  );
+});
+
+/// 🎯 服务端在线人数 Provider（每5秒轮询一次）
+/// 基于服务端 Set 统计，自动去重，不会重复计数
+final onlineCountProvider = StreamProvider.family<int, String>((ref, roomId) async* {
+  // 初始值
+  yield 0;
+
+  // 创建定时器，每5秒获取一次
+  final timer = Stream.periodic(const Duration(seconds: 5));
+
+  await for (final _ in timer) {
+    try {
+      final count = await LiveRoomService.getOnlineCount(roomId);
+      yield count;
+    } catch (e) {
+      // 出错时保持上次值，不中断流
+      print('👥 [OnlineCount] 获取失败: $e');
+    }
+  }
 });
 
 //数据类，定义了一个直播间在推荐列表中显示时所需的所有信息
@@ -101,25 +137,35 @@ class LiveRecommndItem {
   final String title; //标题
   final String hostname; //主播名称
   final String cover; //封面
-  final String region; //是否开播
+  final String region; //地区
   final DateTime startedAt;
+  final int watchCount; // 观看人数
   LiveRecommndItem({
     required this.liveID,
-    required this.title, //
-    required this.hostname,
+    required this.title,
+    required this.hostname, //
     required this.cover,
     required this.region,
     required this.startedAt,
+    this.watchCount = 0,
   });
-  //copyWith 方法：这是 Flutter 中处理不可变数据的标准做法。它允许你修改某个对象的个别属性，同时产生一个新的对象，而不会破坏原来的对象
-  LiveRecommndItem copyWith({String? hostname, String? title, String? cover, String? region, DateTime? startedAt}) {
+  //copyWith 方法：这是 Flutter 中处理不可变数据的标准做法
+  LiveRecommndItem copyWith({
+    String? hostname,
+    String? title,
+    String? cover, //
+    String? region,
+    DateTime? startedAt,
+    int? watchCount,
+  }) {
     return LiveRecommndItem(
       liveID: liveID,
-      title: title ?? this.title, //
+      title: title ?? this.title,
       hostname: hostname ?? this.hostname,
       cover: cover ?? this.cover,
-      region: '',
-      startedAt: startedAt ?? this.startedAt,
+      region: region ?? this.region,
+      startedAt: startedAt ?? this.startedAt, //
+      watchCount: watchCount ?? this.watchCount,
     );
   }
 }
@@ -128,9 +174,22 @@ class LiveRecommndItem {
 class LiveRecommendNotifier extends StateNotifier<List<LiveRecommndItem>> {
   LiveRecommendNotifier() : super(const []);
 
-  void startUpdata({required String liveID, required String hostname, required String title, required String cover, required String region}) {
+  void startUpdata({
+    required String liveID,
+    required String hostname, //
+    required String title,
+    required String cover,
+    required String region,
+  }) {
     final idx = state.indexWhere((e) => e.liveID == liveID);
-    final item = LiveRecommndItem(liveID: liveID, title: title, hostname: hostname, cover: cover, region: region, startedAt: DateTime.now());
+    final item = LiveRecommndItem(
+      liveID: liveID,
+      title: title, //
+      hostname: hostname,
+      cover: cover,
+      region: region,
+      startedAt: DateTime.now(),
+    );
     //如果 liveID 在现有列表中找不到（idx < 0），它会将这个新主播放在列表的最前面
     if (idx < 0) {
       state = [item, ...state];

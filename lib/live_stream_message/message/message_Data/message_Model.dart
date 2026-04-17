@@ -10,8 +10,10 @@ import 'package:video_live_stream/live_stream_message/message/message_Data/chat_
 final messageModelProvider =
     StateNotifierProvider<MessageModelNotifier, List<ChatConversation>>((ref) {
       final notifier = MessageModelNotifier(ref);
-      ref.listen<UserMe>(meProvider, (previous, next) {
-        notifier.syncSelfConversation(next);
+      ref.listen<UserMe?>(meProvider, (previous, next) {
+        if (next != null) {
+          notifier.syncSelfConversation(next);
+        }
       });
       ref.listen<AsyncValue<List<ContactModel>>>(contactListProvider, (
         previous,
@@ -67,10 +69,11 @@ class MessageModelNotifier extends StateNotifier<List<ChatConversation>> {
 
   void _bootstrapSelfConversation() {
     final me = ref.read(meProvider);
+    if (me == null) return;
     final uid = me.uid?.trim().isNotEmpty == true ? me.uid!.trim() : 'self';
     final title = (me.name?.trim().isNotEmpty == true)
         ? me.name!.trim()
-        : '我'; //
+        : '我';
     final avatar = (me.avatar?.trim().isNotEmpty == true)
         ? me.avatar!.trim()
         : 'assets/image/002.png';
@@ -141,11 +144,11 @@ class MessageModelNotifier extends StateNotifier<List<ChatConversation>> {
       }
     }
     final me = ref.read(meProvider);
-    if (me.uid == chatId) {
+    if (me?.uid == chatId) {
       return (
-        title: me.name?.isNotEmpty == true ? me.name! : '我', //
-        avatar: me.avatar?.isNotEmpty == true
-            ? me.avatar!
+        title: me?.name?.isNotEmpty == true ? me!.name! : '我',
+        avatar: me?.avatar?.isNotEmpty == true
+            ? me!.avatar!
             : 'assets/image/002.png',
         bgUrl: 'assets/image/010.jpeg',
       );

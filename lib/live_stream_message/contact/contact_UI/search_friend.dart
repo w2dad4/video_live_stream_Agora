@@ -13,7 +13,7 @@ class AddFriendPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final menuItems = ref.watch(addFriendMenuProvider);
     final me = ref.watch(meProvider);
-    final myCatId = me.uid?.trim().isNotEmpty == true ? me.uid!.trim() : 'me';
+    final myCatId = me?.uid?.trim().isNotEmpty == true ? me!.uid!.trim() : 'me';
     final hit = ref.watch(searchCatAccountProvider);
 
     return Scaffold(

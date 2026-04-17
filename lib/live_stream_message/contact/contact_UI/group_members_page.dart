@@ -15,7 +15,7 @@ class GroupMembersPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final group = ref.watch(groupDetailProvider(groupId));
     final me = ref.watch(meProvider);
-    final myId = me.uid?.trim().isNotEmpty == true ? me.uid!.trim() : 'self';
+    final myId = me?.uid?.trim().isNotEmpty == true ? me!.uid!.trim() : 'self';
     final contacts =
         ref.watch(contactListProvider).value ?? const <ContactModel>[];
 
@@ -40,7 +40,7 @@ class GroupMembersPage extends ConsumerWidget {
           final nickname = group.profileOf(uid).nickname;
           final name = nickname.isNotEmpty
               ? nickname
-              : (contact?.title ?? (uid == myId ? (me.name ?? '我') : '用户$uid'));
+              : (contact?.title ?? (uid == myId ? (me?.name ?? '我') : '用户$uid'));
           final role = group.isOwner(uid)
               ? '群主'
               : (group.isAdmin(uid) ? '管理员' : '成员');

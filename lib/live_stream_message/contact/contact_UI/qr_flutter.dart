@@ -7,8 +7,8 @@ import 'package:video_live_stream/live_stream_message/contact/contact_Data/frien
 /// 我的小猫码：猫猫号 + 二维码（与扫一扫 [CatQrPayload] 对应）
 final myCatQrDataProvider = Provider<String>((ref) {
   final me = ref.watch(meProvider);
-  final id = me.uid?.trim().isNotEmpty == true ? me.uid!.trim() : 'me';
-  return CatQrPayload(catId: id, name: me.name).toQrString();
+  final id = me?.uid?.trim().isNotEmpty == true ? me!.uid!.trim() : 'me';
+  return CatQrPayload(catId: id, name: me?.name ?? '匿名').toQrString();
 });
 
 class QrGeneratorPage extends ConsumerWidget {

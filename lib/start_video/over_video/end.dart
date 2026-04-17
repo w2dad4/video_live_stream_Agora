@@ -2,11 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-// 🟢 方案 A：作为全局工具函数 (放在类外面)
 String _formatDateTime(DateTime time) {
   final hour = time.hour.toString().padLeft(2, '0');
   final minute = time.minute.toString().padLeft(2, '0');
-  return "$hour.$minute"; // 按照你要求的 18.35 格式
+  return "$hour.$minute"; 
 }
 
 //直播结束后的页面

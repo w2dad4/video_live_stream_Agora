@@ -40,11 +40,11 @@ class DetailsPage extends ConsumerWidget {
         // 4. 再从聊天详情 Provider 兜底
         targetContact ??= ref.watch(chatDetailProvider(detailsId));
         // 5. 如果是自己，使用 meProvider 信息兜底
-        if (targetContact == null && me.uid == detailsId) {
+        if (targetContact == null && me?.uid == detailsId) {
           targetContact = ContactModel(
             id: detailsId,
-            title: me.name?.isNotEmpty == true ? me.name! : '我', //
-            iconUrl: me.avatar?.isNotEmpty == true ? me.avatar! : 'assets/image/002.png',
+            title: me?.name?.isNotEmpty == true ? me!.name! : '我',
+            iconUrl: me?.avatar?.isNotEmpty == true ? me!.avatar! : 'assets/image/002.png',
             bgUrl: 'assets/image/010.jpeg',
           );
         }

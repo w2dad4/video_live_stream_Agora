@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:video_live_stream/config/toppop-up.dart';
+import 'package:video_live_stream/features/auth/auth_provider.dart';
 import 'package:video_live_stream/live_stream_My/meProvider_data/meProvider.dart';
 
 class PersonalProfile extends ConsumerWidget {
@@ -20,38 +21,52 @@ class PersonalProfile extends ConsumerWidget {
       body: ListView(
         children: [
           //头像
-          _buildItem(title: '头像', trailingWidget: _buildAvatar(me.avatar), onTap: () => _showAvatarSelector(context, ref)),
+          _buildItem(title: '头像', trailingWidget: _buildAvatar(me?.avatar), onTap: () => _showAvatarSelector(context, ref)),
           const Divider(height: 1, indent: 12, color: Color(0xFFEEEEEE)),
           //标题
           _buildItem(
             title: '标题',
-            value: me.name ?? '未设置',
+            value: me?.name ?? '未设置',
             onTap: () => _editTextField(
               context,
               title: '修改标题',
-              initialValue: me.name ?? '',
+              initialValue: me?.name ?? '',
               onConfirm: (value) {
-                ref.read(meProvider.notifier).update((state) => state.copyWith(name: value.trim()));
+                // 更新当前用户数据
+                final currentUserId = ref.read(currentUserIdProvider);
+                if (currentUserId != null) {
+                  final currentData = ref.read(userDataProvider(currentUserId));
+                  if (currentData != null) {
+                    ref.read(userDataProvider(currentUserId).notifier).updateUserData(currentData.copyWith(name: value.trim()));
+                  }
+                }
               },
             ),
           ),
           const Divider(height: 1, indent: 12, color: Color(0xFFEEEEEE)),
           //固定UID，一个帐号仅此一个UID无法修改
-          _buildItem(title: 'UID', value: me.uid ?? 'unknown', enableArrow: false),
+          _buildItem(title: 'UID', value: me?.uid ?? 'unknown', enableArrow: false),
           const Divider(height: 1, indent: 12, color: Color(0xFFEEEEEE)),
           //性别
-          _buildItem(title: '性别', value: me.gender ?? '未设置', onTap: () => _showGenderSelector(context, ref)),
+          _buildItem(title: '性别', value: me?.gender ?? '未设置', onTap: () => _showGenderSelector(context, ref)),
           const Divider(height: 1, indent: 12, color: Color(0xFFEEEEEE)),
           //地区
           _buildItem(
             title: '地区',
-            value: me.region ?? '未设置',
+            value: me?.region ?? '未设置',
             onTap: () => _editTextField(
               context,
               title: '设置地区',
-              initialValue: me.region == '未设置' ? '' : (me.region ?? ''),
+              initialValue: me?.region == '未设置' ? '' : (me?.region ?? ''),
               onConfirm: (value) {
-                ref.read(meProvider.notifier).update((state) => state.copyWith(region: value.trim().isEmpty ? '未设置' : value.trim()));
+                // 更新当前用户数据
+                final currentUserId = ref.read(currentUserIdProvider);
+                if (currentUserId != null) {
+                  final currentData = ref.read(userDataProvider(currentUserId));
+                  if (currentData != null) {
+                    ref.read(userDataProvider(currentUserId).notifier).updateUserData(currentData.copyWith(region: value.trim().isEmpty ? '未设置' : value.trim()));
+                  }
+                }
               },
             ),
           ),
@@ -59,14 +74,21 @@ class PersonalProfile extends ConsumerWidget {
           //签名
           _buildItem(
             title: '签名',
-            value: me.signature ?? '这个人很懒，还没有签名',
+            value: me?.signature ?? '这个人很懒，还没有签名',
             onTap: () => _editTextField(
               context,
               title: '设置签名',
-              initialValue: me.signature ?? '',
+              initialValue: me?.signature ?? '',
               maxLines: 3,
               onConfirm: (value) {
-                ref.read(meProvider.notifier).update((state) => state.copyWith(signature: value.trim().isEmpty ? '这个人很懒，还没有签名' : value.trim()));
+                // 更新当前用户数据
+                final currentUserId = ref.read(currentUserIdProvider);
+                if (currentUserId != null) {
+                  final currentData = ref.read(userDataProvider(currentUserId));
+                  if (currentData != null) {
+                    ref.read(userDataProvider(currentUserId).notifier).updateUserData(currentData.copyWith(signature: value.trim().isEmpty ? '这个人很懒，还没有签名' : value.trim()));
+                  }
+                }
               },
             ),
           ),
@@ -146,8 +168,14 @@ class PersonalProfile extends ConsumerWidget {
       );
       //如果用户没有选择图片，则直接返回
       if (image == null) return;
-      // 3. 成功拿到路径，更新 Riverpod 状态
-      ref.read(meProvider.notifier).update((state) => state.copyWith(avatar: image.path));
+      // 3. 成功拿到路径，更新用户数据
+      final currentUserId = ref.read(currentUserIdProvider);
+      if (currentUserId != null) {
+        final currentData = ref.read(userDataProvider(currentUserId));
+        if (currentData != null) {
+          ref.read(userDataProvider(currentUserId).notifier).updateUserData(currentData.copyWith(avatar: image.path));
+        }
+      }
       //成功提醒
       if (context.mounted) {
         ToastUtil.showGreenSuccess(context, "成功", "头像已更新");
@@ -170,21 +198,21 @@ class PersonalProfile extends ConsumerWidget {
             ListTile(
               title: const Center(child: Text('男')),
               onTap: () {
-                ref.read(meProvider.notifier).update((state) => state.copyWith(gender: '男'));
+                _updateGender(ref, '男');
                 Navigator.pop(context);
               },
             ),
             ListTile(
               title: const Center(child: Text('女')),
               onTap: () {
-                ref.read(meProvider.notifier).update((state) => state.copyWith(gender: '女'));
+                _updateGender(ref, '女');
                 Navigator.pop(context);
               },
             ),
             ListTile(
               title: const Center(child: Text('保密')),
               onTap: () {
-                ref.read(meProvider.notifier).update((state) => state.copyWith(gender: '保密'));
+                _updateGender(ref, '保密');
                 Navigator.pop(context);
               },
             ),
@@ -192,6 +220,17 @@ class PersonalProfile extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  // 更新性别
+  void _updateGender(WidgetRef ref, String gender) {
+    final currentUserId = ref.read(currentUserIdProvider);
+    if (currentUserId != null) {
+      final currentData = ref.read(userDataProvider(currentUserId));
+      if (currentData != null) {
+        ref.read(userDataProvider(currentUserId).notifier).updateUserData(currentData.copyWith(gender: gender));
+      }
+    }
   }
 
   //弹出一个包含输入框的对话框

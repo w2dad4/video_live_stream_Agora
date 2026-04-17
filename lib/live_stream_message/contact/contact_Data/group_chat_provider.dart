@@ -27,9 +27,8 @@ final groupDetailProvider = Provider.family<GroupChatModel?, String>((ref, id) {
 
 class GroupChatNotifier extends AsyncNotifier<List<GroupChatModel>> {
   String _uid() {
-    return ref.read(meProvider).uid?.trim().isNotEmpty == true
-        ? ref.read(meProvider).uid!.trim()
-        : 'self';
+    final me = ref.read(meProvider);
+    return me?.uid?.trim().isNotEmpty == true ? me!.uid!.trim() : 'self';
   }
 
   @override

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:video_live_stream/tool/color.dart';
 import 'package:video_live_stream/tool/index.dart';
+import 'package:video_live_stream/utility/pullRefreshContainer.dart';
 
 class VideoEnterinmentPage extends StatefulWidget {
   const VideoEnterinmentPage({super.key});
@@ -9,14 +10,24 @@ class VideoEnterinmentPage extends StatefulWidget {
 }
 
 class VideoEnterinmentPageState extends State<VideoEnterinmentPage> {
+  Future<void> _loadData() async {
+    // 模拟刷新，后续可接入真实数据接口
+    await Future.delayed(const Duration(seconds: 1));
+    if (mounted) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     double bottomPadding = MediaQuery.of(context).padding.bottom;
 
-    return ListView.builder(
-      padding: EdgeInsets.fromLTRB(0, 0, 0, bottomPadding - 5),
-      itemCount: VideoIndex.gameList.length,
-      itemBuilder: (context, index) {
+    return PullRefreshContainer(
+      onRefresh: _loadData,
+      child: ListView.builder(
+        padding: EdgeInsets.fromLTRB(0, 0, 0, bottomPadding - 5),
+        physics: const NeverScrollableScrollPhysics(),
+        shrinkWrap: true,
+        itemCount: VideoIndex.gameList.length,
+        itemBuilder: (context, index) {
         final item = VideoIndex.gameList[index];
         return Padding(
           padding: EdgeInsets.all(10),
@@ -56,6 +67,7 @@ class VideoEnterinmentPageState extends State<VideoEnterinmentPage> {
           ),
         );
       },
+      ),
     );
   }
 }

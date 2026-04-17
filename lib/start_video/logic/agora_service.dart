@@ -7,6 +7,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:video_live_stream/config/constants.dart';
 import 'package:video_live_stream/start_video/logic/agora_token_service.dart';
+import 'package:video_live_stream/services/live_room_service.dart';
 import 'package:video_live_stream/live_stream_My/meProvider_data/meProvider.dart';
 
 /// Agora App ID - 从配置中心读取
@@ -17,13 +18,15 @@ enum LiveQuality {
   sd360p(name: '流畅', videoBitrate: 400, audioBitrate: 24, fps: 15, videoDimensions: VideoDimensions(width: 640, height: 360)),
   sd480p(name: '标清', videoBitrate: 800, audioBitrate: 24, fps: 24, videoDimensions: VideoDimensions(width: 640, height: 480)),
   sd720p(name: '高清', videoBitrate: 1500, audioBitrate: 32, fps: 30, videoDimensions: VideoDimensions(width: 1280, height: 720)),
-  fhd1080p(name: '超清', videoBitrate: 2500, audioBitrate: 48, fps: 30, videoDimensions: VideoDimensions(width: 1920, height: 1080));
+  fhd1080p(name: '超清', videoBitrate: 2500, audioBitrate: 48, fps: 30, videoDimensions: VideoDimensions(width: 1920, height: 1080)),
+  original(name: '原画', videoBitrate: 0, audioBitrate: 48, fps: 30, videoDimensions: VideoDimensions(width: 0, height: 0)); // 原画使用设备摄像头默认分辨率
 
   final String name;
   final int videoBitrate;
   final int audioBitrate;
   final int fps;
   final VideoDimensions videoDimensions;
+  bool get isOriginal => this == LiveQuality.original;
 
   const LiveQuality({required this.name, required this.videoBitrate, required this.audioBitrate, required this.fps, required this.videoDimensions});
 }
@@ -66,6 +69,12 @@ class AgoraEngineManager {
       // ⚡ 配置低延迟直播参数
       await _engine!.setParameters('{"rtc.log_level": 2}');
       await _engine!.setParameters('{"rtc.enable_audio_bwe": true}');
+      // 🚀 开启低延迟模式（延迟从2-3秒降至0.5-1秒）
+      await _engine!.setParameters('{"rtc.video.enable_low_latency_mode": true}');
+      // 🚀 开启自适应码率（网络差时自动降码率防卡顿）
+      await _engine!.setParameters('{"rtc.video.enable_adaptive_bitrate": true}');
+      // 🚀 开启双流模式（观众可自动切换高低画质）
+      await _engine!.enableDualStreamMode(enabled: true);
     }
     _refCount++;
     return _engine!;
@@ -180,7 +189,7 @@ class AgoraHostService extends AsyncNotifier<void> {
 
       // 1. 从服务端获取 Token（关键：确保安全，AppCert 不在客户端）
       final user = ref.read(meProvider);
-      final userId = (user.uid?.isEmpty ?? true) ? 'host_${DateTime.now().millisecondsSinceEpoch}' : user.uid!;
+      final userId = (user?.uid?.isEmpty ?? true) ? 'host_${DateTime.now().millisecondsSinceEpoch}' : user!.uid!;
       _token = await AgoraTokenService.fetchToken(roomId: channelId, isHost: true, userId: userId);
       debugPrint('✅ Token 获取成功 uid=${_token!.uid}, 过期时间=${DateTime.fromMillisecondsSinceEpoch(_token!.expireTime * 1000)}');
 
@@ -228,7 +237,6 @@ class AgoraHostService extends AsyncNotifier<void> {
     } catch (e) {
       // 开播失败，重置状态
       ref.read(isPublishingProvider.notifier).state = false;
-      await AgoraTokenService.clearDefaultRoom();
       debugPrint('❌ 推流启动失败: $e');
       rethrow;
     }
@@ -317,7 +325,8 @@ class AgoraHostService extends AsyncNotifier<void> {
       await AgoraEngineManager.releaseEngine();
       _engine = null;
     }
-    await AgoraTokenService.clearDefaultRoom();
+    // 删除直播间（从服务端移除）
+    await LiveRoomService.deleteRoom(roomId);
   }
 
   /// 启动 Token 刷新定时器
@@ -361,7 +370,7 @@ class AgoraAudienceService extends AsyncNotifier<void> {
 
       // 1. 从服务端获取 Token
       final user = ref.read(meProvider);
-      final userId = (user.uid?.isEmpty ?? true) ? 'audience_${DateTime.now().millisecondsSinceEpoch}' : user.uid!;
+      final userId = (user?.uid?.isEmpty ?? true) ? 'audience_${DateTime.now().millisecondsSinceEpoch}' : user!.uid!;
       _token = await AgoraTokenService.fetchToken(roomId: channelId, isHost: false, userId: userId);
       debugPrint('AgoraToken: 观众获取成功 uid=${_token!.uid}, 过期时间=${DateTime.fromMillisecondsSinceEpoch(_token!.expireTime * 1000)}');
 

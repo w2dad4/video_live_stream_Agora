@@ -30,7 +30,7 @@ class AnchorNotifier extends StateNotifier<AnchorState> {
 
       // 模拟请求与排序逻辑
       await Future.delayed(const Duration(seconds: 2));
-      var mockList = List<NearbyAnchor>.from(VideoDiscoverPage.mockData);
+      var mockList = List<NearbyAnchor>.from([]);
       mockList.sort((a, b) => a.distance.compareTo(b.distance));
       state = state.copyWith(anchors: mockList, isLoading: false);
     } catch (e) {

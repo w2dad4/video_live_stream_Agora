@@ -1,6 +1,5 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:video_live_stream/library.dart';
 
@@ -53,10 +52,12 @@ class BuildHostMenu extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final notifier = ref.read(agoraHostServiceProvider(roomID).notifier);
-    final isMicEnabled = !notifier.isMicrophoneMuted;
+    // 🎤 使用新的主播服务
+    final notifier = ref.read(anchorServiceProvider(roomID).notifier);
+    final isMicEnabled = ref.watch(anchorMicEnabledProvider);
     final isRecording = ref.watch(isRecordingProvider); //用于控制录播颜色
-    final currentQuality = ref.watch(currentQualityProvider);
+    // 📝 直播间只显示画质，不可切换
+    final currentQuality = ref.watch(anchorQualityProvider);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -118,12 +119,14 @@ class BuildHostMenu extends ConsumerWidget {
                 );
               },
             ),
-            //清晰度
+            // 当前画质（只读显示，直播中不可切换，仅在预览页面可切换）
             _menuItem(
-              Icons.blur_on,
+              CupertinoIcons.checkmark_shield_fill,
               currentQuality.name, // 显示当前选中的清晰度名称
-              () => _showQualityPicker(context, ref),
-              color: Colors.lightBlueAccent,
+              color: Colors.greenAccent,
+              () {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('直播中不可切换画质，请在预览页面设置'), duration: Duration(seconds: 2)));
+              },
             ),
 
             //直播时长
@@ -161,20 +164,6 @@ class BuildHostMenu extends ConsumerWidget {
           Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12)),
         ],
       ),
-    );
-  }
-
-  // 弹出清晰度选择器
-  void _showQualityPicker(BuildContext context, WidgetRef ref) {
-    AppDialogstate.showSelectionSheet<LiveQuality>(
-      context: context,
-      title: '选择直播清晰度',
-      message: '更高的清晰度需要更好的网络带宽',
-      options: LiveQuality.values,
-      getlabel: (quality) => quality.name,
-      onSelected: (quality) {
-        ref.read(agoraHostServiceProvider(roomID).notifier).changeQuality(quality);
-      },
     );
   }
 }

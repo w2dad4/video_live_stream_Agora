@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:video_live_stream/tool/index.dart';
 import 'package:video_live_stream/tool/onRefresh.dart';
+import 'package:video_live_stream/utility/pullRefreshContainer.dart';
 
 class PkPage extends StatefulWidget {
   const PkPage({super.key});
@@ -11,28 +12,39 @@ class PkPage extends StatefulWidget {
 }
 
 class PkPageState extends State<PkPage> {
+  Future<void> _loadData() async {
+    // 模拟刷新，后续可接入真实数据接口
+    await Future.delayed(const Duration(seconds: 1));
+    if (mounted) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.all(10),
-      child: GridView.builder(
-        padding: EdgeInsets.fromLTRB(
-          0,
-          5,
-          0,
-          Positions.topPadding(context) + 10,
+    return PullRefreshContainer(
+      onRefresh: _loadData,
+      child: Padding(
+        padding: EdgeInsets.all(10),
+        child: GridView.builder(
+          physics: const NeverScrollableScrollPhysics(),
+          shrinkWrap: true,
+          padding: EdgeInsets.fromLTRB(
+            0,
+            0,
+            0,
+            Positions.topPadding(context) + 10,
+          ),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 10,
+            childAspectRatio: 1,
+          ),
+          itemCount: VideoIndex.contentsindex.length,
+          itemBuilder: (context, index) {
+            final item = VideoIndex.contentsindex[index];
+            return _buildItem(item);
+          },
         ),
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          crossAxisSpacing: 10,
-          mainAxisSpacing: 10,
-          childAspectRatio: 1,
-        ),
-        itemCount: VideoIndex.contentsindex.length,
-        itemBuilder: (context, index) {
-          final item = VideoIndex.contentsindex[index];
-          return _buildItem(item);
-        },
       ),
     );
   }

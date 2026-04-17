@@ -1,18 +1,10 @@
-import 'package:camera/camera.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
-import 'package:video_live_stream/config/constants.dart';
 import 'package:go_router/go_router.dart';
-import 'package:video_live_stream/live_stream_My/meProvider_data/meProvider.dart';
-import 'package:video_live_stream/live_stream_discover/live_streaming_starts/logic_layer_data/beauty_provider.dart';
-import 'package:video_live_stream/live_stream_discover/live_streaming_starts/logic_layer_data/logic_layer.dart';
-import 'package:video_live_stream/live_stream_discover/select_Album/dialogbox.dart';
-import 'package:video_live_stream/live_stream_discover/select_Album/select_Album.dart';
-import 'package:video_live_stream/live_stream_discover/live_streaming_starts/shiping_UI/preview.dart';
-import 'package:video_live_stream/start_video/beauty.dart';
-import 'package:video_live_stream/start_video/logic/agora_token_service.dart';
+import 'package:video_live_stream/live_stream_discover/live_streaming_starts/shiping_UI/agora_preview_page.dart';
+import 'package:video_live_stream/start_video/logic/agora_preview_service.dart';
+import 'package:video_live_stream/library.dart';
 
 //直播预览
 final stars = StateProvider<bool>((ref) => false); // 美颜状态，默认为关闭
@@ -30,7 +22,7 @@ class VideoShipingPage extends ConsumerWidget {
 
     return Stack(
       children: [
-        const VideoPreviewPage(), //调用摄像头的预览组件
+        const AgoraPreviewPage(), // Agora 摄像头预览（仅预览，不推流）
         const SelectAlbum(mode: LiveMode.video), //顶部封面，所有人可见，定位
         //封面
         Positioned(
@@ -47,16 +39,9 @@ class VideoShipingPage extends ConsumerWidget {
                     icon: CupertinoIcons.camera_viewfinder,
                     color: Colors.white,
                     onTap: () {
-                      //点击后切换摄像头
-                      debugPrint('点击后切换摄像头');
-                      final cameras = ref.read(camersProvider).value;
-                      if (cameras != null && cameras.isNotEmpty) {
-                        ref
-                            .read(cameraStateProvider.notifier)
-                            .switchCamera(cameras);
-                      } else {
-                        debugPrint('摄像头未准备好');
-                      }
+                      // Agora 切换摄像头
+                      debugPrint('Agora: 切换摄像头');
+                      ref.read(agoraPreviewProvider.notifier).switchCamera();
                     },
                     label: '翻转',
                   ),
@@ -64,13 +49,9 @@ class VideoShipingPage extends ConsumerWidget {
                   //美颜
                   _buildActionButton(
                     icon: CupertinoIcons.wand_stars,
-                    color: starsState
-                        ? Colors.pink
-                        : Colors.white, //根据美颜状态改变图标颜色
+                    color: starsState ? Colors.pink : Colors.white, //根据美颜状态改变图标颜色
                     onTap: () {
-                      ref
-                          .read(stars.notifier)
-                          .update((state) => !state); //切换美颜状态
+                      ref.read(stars.notifier).update((state) => !state); //切换美颜状态
                       ref.read(beautyProvider.notifier).toggleBeauty();
                       if (!starsState) {
                         _showBeautyPanel(context);
@@ -82,44 +63,30 @@ class VideoShipingPage extends ConsumerWidget {
                   SizedBox(width: 15),
                   //闪光灯
                   _buildActionButton(
-                    icon: ref
-                        .watch(cameraStateProvider)
-                        .maybeWhen(
-                          data: (c) => c.value.flashMode == FlashMode.torch
-                              ? CupertinoIcons
-                                    .bolt_fill //
-                              : CupertinoIcons.bolt_slash_fill,
-                          orElse: () => CupertinoIcons.bolt_slash_fill,
-                        ),
-                    color: ref
-                        .watch(cameraStateProvider)
-                        .maybeWhen(
-                          data: (c) => c.value.flashMode == FlashMode.torch
-                              ? Colors.yellow
-                              : Colors.white, //
-                          orElse: () => Colors.white,
-                        ), //根据闪光灯状态改变图标颜色
+                    icon: CupertinoIcons.bolt_slash_fill,
+                    color: Colors.white,
                     onTap: () {
-                      ref
-                          .read(cameraStateProvider.notifier)
-                          .toggleFlash(); // 切换闪光灯模式
-                      debugPrint('点击了闪光灯');
+                      // Agora 切换闪光灯
+                      ref.read(agoraPreviewProvider.notifier).toggleFlash();
+                      debugPrint('Agora: 切换闪光灯');
                     },
                     label: '闪光灯',
                   ),
                   SizedBox(width: 15),
                   //麦克风
                   _buildActionButton(
-                    icon: ref.watch(isMicOpenProvider)
-                        ? CupertinoIcons.mic_fill
-                        : CupertinoIcons.mic_slash_fill, //
-                    color: ref.read(isMicOpenProvider)
-                        ? Colors.white
-                        : Colors.redAccent,
+                    icon: ref.watch(agoraPreviewProvider).maybeWhen(data: (s) => s.isMicOn ? CupertinoIcons.mic_fill : CupertinoIcons.mic_slash_fill, orElse: () => CupertinoIcons.mic_fill),
+                    color: ref.watch(agoraPreviewProvider).maybeWhen(data: (s) => s.isMicOn ? Colors.white : Colors.redAccent, orElse: () => Colors.white),
                     label: '麦克风',
-                    onTap: () => ref
-                        .read(cameraStateProvider.notifier)
-                        .toggleMicrophone(),
+                    onTap: () => ref.read(agoraPreviewProvider.notifier).toggleMicrophone(),
+                  ),
+                  //画质切换 - 预览页面可选择，默认原画
+                  SizedBox(width: 15),
+                  _buildActionButton(
+                    icon: CupertinoIcons.arrowtriangle_right_square,
+                    color: Colors.white,
+                    onTap: () => _showQualityPicker(context, ref),
+                    label: ref.watch(agoraPreviewProvider).maybeWhen(data: (s) => s.quality.name, orElse: () => '超清'), // 显示当前选择的画质名称
                   ),
                 ],
               ),
@@ -143,26 +110,74 @@ class VideoShipingPage extends ConsumerWidget {
     );
   }
 
+  //画质选择弹出面板
+  void _showQualityPicker(BuildContext context, WidgetRef ref) {
+    final currentQuality = ref.read(currentQualityProvider);
+
+    showModalBottomSheet(
+      isScrollControlled: false,
+      backgroundColor: Colors.transparent,
+      context: context,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.9),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: SafeArea(
+          child: ListView(
+            children: [
+              Container(
+                margin: const EdgeInsets.only(top: 8),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(2)),
+              ),
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: Text(
+                  '选择画质',
+                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+              ),
+              ...LiveQuality.values.map(
+                (quality) => ListTile(
+                  leading: Icon(quality == currentQuality ? CupertinoIcons.check_mark_circled_solid : CupertinoIcons.circle, color: quality == currentQuality ? Colors.blueAccent : Colors.white70),
+                  title: Text(quality.name, style: const TextStyle(color: Colors.white)),
+                  subtitle: Text(_getQualityDescription(quality), style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12)),
+                  onTap: () {
+                    ref.read(currentQualityProvider.notifier).state = quality;
+                    debugPrint('选择画质: ${quality.name}');
+                    Navigator.pop(context);
+                  },
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _getQualityDescription(LiveQuality quality) {
+    return switch (quality) {
+      LiveQuality.sd360p => '360P • 流畅省流',
+      LiveQuality.sd480p => '480P • 标清',
+      LiveQuality.sd720p => '720P • 高清',
+      LiveQuality.fhd1080p => '1080P • 超清',
+      LiveQuality.original => '使用手机摄像头原画',
+    };
+  }
+
   //美颜
-  Widget _buildActionButton({
-    required IconData icon,
-    required Color color,
-    required VoidCallback onTap,
-    String? label,
-  }) {
+  Widget _buildActionButton({required IconData icon, required Color color, required VoidCallback onTap, String? label}) {
     return Column(
       children: [
         InkWell(
           onTap: onTap,
           child: Icon(icon, color: color, size: 23),
         ),
-        Text(
-          label ?? '',
-          style: const TextStyle(
-            color: Color.fromARGB(255, 242, 241, 241),
-            fontSize: 10,
-          ),
-        ),
+        Text(label ?? '', style: const TextStyle(color: Color.fromARGB(255, 242, 241, 241), fontSize: 10)),
       ],
     );
   }
@@ -172,7 +187,6 @@ class VideoShipingPage extends ConsumerWidget {
 class StartVideo extends ConsumerWidget {
   final double width;
   const StartVideo({super.key, required this.width});
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return InkWell(
@@ -181,56 +195,43 @@ class StartVideo extends ConsumerWidget {
         final bool? shoulbEnter = await _enterthelivestream(context);
         //判断用户是否点击了开启直播
         if (shoulbEnter == true && context.mounted) {
-          final liveId = ref.read(meProvider).uid ?? '';
+          final me = ref.read(meProvider);
+          final liveId = me?.uid ?? '';
           if (liveId.isEmpty) {
             if (context.mounted) {
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(const SnackBar(content: Text('直播间ID为空，暂时无法直播')));
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('直播间ID为空，暂时无法直播')));
             }
             return;
           }
-          final me = ref.read(meProvider);
           final title = ref.read(liveTitleProvider(LiveMode.video));
           final region = ref.read(positioningProvider(LiveMode.video));
-          final cover = me.avatar ?? 'assets/image/002.png';
-          // 关闭预览页会话开关，避免后台自动重启 camera 插件
-          ref.read(previewCameraActiveProvider.notifier).state = false;
-          // 关键：释放 camera 插件占用的摄像头，避免与 WebRTC 抢占导致黑屏
-          await ref.read(cameraStateProvider.notifier).releaseCamera();
+          final cover = me?.avatar ?? 'assets/image/002.png';
+          // 停止 Agora 预览，释放资源
+          await ref.read(agoraPreviewProvider.notifier).stopPreview();
           if (!context.mounted) return;
-          // 释放 camera 插件的摄像头，避免和 WebRTC 冲突
           ref
               .read(liverecommendProvider.notifier)
               .startUpdata(
                 liveID: liveId,
-                hostname: me.name ?? '主播',
-                title: title.isEmpty ? '${me.name ?? '主播'}的直播间' : title, //
+                hostname: me?.name ?? '主播',
+                title: title.isEmpty ? (me?.name ?? '主播') : title,
                 cover: cover,
                 region: region,
               );
           if (!context.mounted) return;
           // 跳转到直播间，并标记自动开播
-          context.pushNamed(
-            'StartVideo',
-            extra: {"id": liveId, 'isHost': true, 'autoStart': true},
-          );
+          context.pushNamed('StartVideo', extra: {"id": liveId, 'isHost': true, 'autoStart': true});
         }
       },
       child: Container(
         alignment: Alignment.center,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(25),
-          gradient: const LinearGradient(
-            colors: [Colors.redAccent, Colors.red],
-          ),
+          gradient: const LinearGradient(colors: [Colors.redAccent, Colors.red]),
         ),
         width: width,
         height: 50,
-        child: Text(
-          '开启视频直播',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
+        child: Text('开启视频直播', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
       ),
     );
   }
@@ -243,14 +244,8 @@ class StartVideo extends ConsumerWidget {
         title: Text('开始视频直播'),
         content: const Text('即将进入直播间开启直播，请确认网络状态良好。'),
         actions: [
-          CupertinoDialogAction(
-            child: const Text('我再想想'),
-            onPressed: () => context.pop(false),
-          ),
-          CupertinoDialogAction(
-            child: const Text('确认进入'),
-            onPressed: () => context.pop(true),
-          ),
+          CupertinoDialogAction(child: const Text('我再想想'), onPressed: () => context.pop(false)),
+          CupertinoDialogAction(child: const Text('确认进入'), onPressed: () => context.pop(true)),
         ],
       ),
     );

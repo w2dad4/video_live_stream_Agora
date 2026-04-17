@@ -1,12 +1,11 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math';
-
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:video_live_stream/library.dart';
+import 'package:video_live_stream/live_stream_discover/voice_live_streaming/voicelive_Data/chat_socket_provider.dart';
 
 //语音直播的整个UI
 class AudioViodePage extends ConsumerStatefulWidget {
@@ -28,36 +27,53 @@ class _AudioViodePageState extends ConsumerState<AudioViodePage> {
     _clock = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() => _now = DateTime.now());
     });
+    // 初始化 WebSocket 连接
+    _initWebSocket();
+  }
+
+  void _initWebSocket() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final me = ref.read(meProvider);
+      if (me == null) return;
+      final myId = me.uid?.trim().isNotEmpty == true ? me.uid!.trim() : 'self';
+      final isHost = myId == widget.audioID;
+      final role = isHost ? 'host' : 'viewer';
+
+      // 使用带角色的 provider 初始化 WebSocket
+      ref.read(chatSocketWithRoleProvider((roomId: widget.audioID, role: role)).notifier);
+      debugPrint('💬 [AudioVideo] WebSocket 初始化: role=$role, room=${widget.audioID}');
+    });
   }
 
   @override
   void dispose() {
     _clock?.cancel();
+    // WebSocket 会在 provider dispose 时自动断开
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final me = ref.watch(meProvider);
-    final myId = me.uid?.trim().isNotEmpty == true ? me.uid!.trim() : 'self';
+    final myId = me?.uid?.trim().isNotEmpty == true ? me!.uid!.trim() : 'self';
     final isHost = myId == widget.audioID;
     final room = ref.watch(voiceRoomProvider(widget.audioID));
 
     if (!_inited) {
       _inited = true;
       Future.microtask(() {
-        ref
-            .read(voiceRoomProvider(widget.audioID).notifier)
-            .initRoom(
-              hostId: widget.audioID,
-              hostName: isHost ? (me.name ?? '主播') : '主播', //
-              hostAvatar: isHost ? (me.avatar ?? 'assets/image/002.png') : 'assets/image/002.png',
-            );
+        ref.read(voiceRoomProvider(widget.audioID).notifier).initRoom(hostId: widget.audioID, hostName: isHost ? (me?.name ?? '主播') : '主播', hostAvatar: isHost ? (me?.avatar ?? 'assets/image/002.png') : 'assets/image/002.png');
       });
     }
 
     final hostSeat = room.seats.first;
     final duration = _formatDuration(_now.difference(room.startAt));
+
+    // 监听 WebSocket 实时在线人数
+    final onlineCountAsync = ref.watch(chatOnlineCountProvider(widget.audioID));
+    final wsOnlineCount = onlineCountAsync.when(data: (count) => count, loading: () => 0, error: (_, __) => 0);
+    // 使用 WebSocket 人数（更准），如果还没收到就用本地统计
+    final displayOnlineCount = wsOnlineCount > 0 ? wsOnlineCount : max(1, room.seats.where((s) => s.uid != null).length);
 
     return Scaffold(
       backgroundColor: const Color(0xff1A1B25),
@@ -65,11 +81,7 @@ class _AudioViodePageState extends ConsumerState<AudioViodePage> {
         backgroundColor: const Color(0xff1A1B25),
         automaticallyImplyLeading: false,
         titleSpacing: 8,
-        title: _HostInfoCard(
-          hostName: hostSeat.name ?? '主播',
-          hostAvatar: hostSeat.avatar ?? 'assets/image/002.png', //
-          onlineCount: max(1, room.seats.where((s) => s.uid != null).length),
-        ),
+        title: _HostInfoCard(hostName: hostSeat.name ?? '主播', hostAvatar: hostSeat.avatar ?? 'assets/image/002.png', onlineCount: displayOnlineCount),
         leading: IconButton(icon: const Icon(Icons.arrow_back_ios), onPressed: () => context.pop()),
         actions: [
           if (isHost)

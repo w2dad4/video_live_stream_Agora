@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:video_live_stream/utility/live_online_count_widget.dart';
 import 'package:video_live_stream/live_stream_My/meProvider_data/meProvider.dart';
 import 'package:video_live_stream/start_video/gift_view.dart';
 import 'package:video_live_stream/start_video/room_manager_logic.dart';
@@ -10,8 +11,9 @@ import 'package:video_live_stream/start_video/start_video_mian.dart';
 //1,顶上的主播的头像，名称，观看人数以及信息发送及显示
 class LiveRoomComponents extends ConsumerWidget {
   final LiveDataMode info;
+  final bool isHost; // 🎯 是否是主播模式
 
-  const LiveRoomComponents({super.key, required this.info});
+  const LiveRoomComponents({super.key, required this.info, this.isHost = false});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -36,13 +38,11 @@ class LiveRoomComponents extends ConsumerWidget {
                   const Text('直播中', style: TextStyle(fontSize: 13, color: Colors.redAccent)),
                 ],
               ),
-              //人数显示
-              Row(
-                children: [
-                  const Icon(CupertinoIcons.person_2_fill, size: 18, color: Colors.white),
-                  const Text(': ', style: TextStyle(fontSize: 15, color: Colors.white)),
-                  Text("${info.watchCount}", style: const TextStyle(fontSize: 13, color: Colors.white)),
-                ],
+              //人数显示 - 使用通用在线人数组件
+              LiveOnlineCountWidget(
+                roomId: info.liveID,
+                isHost: isHost,
+                iconSize: 18,
               ),
             ],
           ),
@@ -69,9 +69,9 @@ class LiveChatOverlay extends ConsumerWidget {
         children: [
           // 无论主播观众都看得到消息列表
           BuildChatList(),
-          const SizedBox(height: 20),
           // 根据主播观众显示不同的底部工具栏
           isHost ? HostActionRow(roomID: roomID) : ChatInput(roomID: roomID),
+          const SizedBox(height: 20),
         ],
       ),
     );
@@ -224,7 +224,7 @@ class ChatInputState extends ConsumerState<ChatInput> {
     // 2. 获取当前发送者的用户信息
     final me = ref.read(meProvider);
     // 3. 构造消息模型
-    final newMessage = ChatsMessage(content: text, uid: me.uid ?? '', userName: me.name ?? "匿名用户");
+    final newMessage = ChatsMessage(content: text, uid: me?.uid ?? '', userName: me?.name ?? "匿名用户");
 
     // 4. 使用 Riverpod 更新全局消息列表
     ref.read(chatmessageProvider.notifier).update((state) => [...state, newMessage]);

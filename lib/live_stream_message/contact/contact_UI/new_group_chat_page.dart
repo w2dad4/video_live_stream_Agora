@@ -46,7 +46,7 @@ class _NewGroupChatPageState extends ConsumerState<NewGroupChatPage> {
       tag: '群聊',
     );
     final me = ref.read(meProvider);
-    final ownerId = me.uid?.trim().isNotEmpty == true ? me.uid!.trim() : 'self';
+    final ownerId = me?.uid?.trim().isNotEmpty == true ? me!.uid!.trim() : 'self';
     final memberIds = <String>{ownerId, ..._selected}.toList();
     await ref.read(contactModelProvider).addContact(group);
     await ref
@@ -64,7 +64,7 @@ class _NewGroupChatPageState extends ConsumerState<NewGroupChatPage> {
   @override
   Widget build(BuildContext context) {
     final me = ref.watch(meProvider);
-    final myId = me.uid?.trim() ?? 'self';
+    final myId = me?.uid?.trim() ?? 'self';
     final async = ref.watch(contactListProvider);
 
     return Scaffold(

@@ -68,7 +68,7 @@ dependency_overrides:
   hooks_riverpod: ^3.3.1
   device_info_plus: ^12.4.0 #自动识别设备号
   permission_handler: ^12.0.1 #权限守卫
-
+  web_socket_channel: ^3.0.3 #消息模型
 flutter_launcher_icons:
   android: true
   ios: true

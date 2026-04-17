@@ -21,7 +21,7 @@ class Microphone extends ConsumerWidget {
                 color: isMuted ? Colors.white : Colors.red,
               ),
               onPressed: () {
-                ref.read(micMutedProvider.notifier).state = isMuted;
+                ref.read(micMutedProvider.notifier).state = !isMuted; // 
               }, //
             );
           },

@@ -47,7 +47,7 @@ class Startaudio extends ConsumerWidget {
         final bool? shoulbEnter = await _enterthelivestream(context);
         //判断用户是否点击了开启直播
         if (shoulbEnter == true && context.mounted) {
-          final audioID = ref.read(meProvider).uid;
+          final audioID = ref.read(meProvider)?.uid;
           //执行真正跳转的逻辑
           context.pushNamed('AudioViode', extra: {"id": audioID});
         }

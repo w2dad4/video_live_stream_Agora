@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:video_live_stream/start_video/beauty.dart';
 import 'package:video_live_stream/live_stream_discover/live_streaming_starts/shiping_UI/video_shiping.dart';
-import 'package:video_live_stream/start_video/logic/agora_service.dart';
+import 'package:video_live_stream/features/anchor/logic/index.dart';
 import 'package:video_live_stream/start_video/maxim.dart';
 
 final isPanelExpandedProvider = StateProvider<bool>((ref) => false);
@@ -29,9 +29,9 @@ class _CameraActionControls extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final starsState = ref.watch(stars);
     final isNot = ref.watch(isPanelExpandedProvider);
-    final notifier = ref.watch(agoraHostServiceProvider(roomID).notifier);
-    // Agora 麦克风状态从 notifier 获取
-    final isMicEnabled = !notifier.isMicrophoneMuted;
+    final notifier = ref.watch(anchorServiceProvider(roomID).notifier);
+    // 麦克风状态从 Provider 读取
+    final isMicEnabled = ref.watch(anchorMicEnabledProvider);
 
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -43,11 +43,7 @@ class _CameraActionControls extends ConsumerWidget {
             icon: Icons.group_off,
             color: Colors.white,
             onTap: () {
-              showModalBottomSheet(
-                context: context,
-                backgroundColor: Colors.transparent,
-                builder: (context) => const ShowMuteManagement(),
-              );
+              showModalBottomSheet(context: context, backgroundColor: Colors.transparent, builder: (context) => const ShowMuteManagement());
             },
           ),
         ],
@@ -59,9 +55,7 @@ class _CameraActionControls extends ConsumerWidget {
             children: [
               // 主开关按钮
               _PanelIconButton(
-                icon: isNot
-                    ? Icons.zoom_out_map_outlined
-                    : Icons.zoom_in_map_outlined,
+                icon: isNot ? Icons.zoom_out_map_outlined : Icons.zoom_in_map_outlined,
                 color: isNot ? Colors.pink : Colors.white,
                 onTap: () {
                   ref.read(isPanelExpandedProvider.notifier).state = !isNot;
@@ -71,14 +65,12 @@ class _CameraActionControls extends ConsumerWidget {
                 // 麦克风控制 — 通过 Agora SDK
                 const SizedBox(height: 7),
                 _PanelIconButton(
-                  icon: isMicEnabled
-                      ? CupertinoIcons.mic_fill
-                      : CupertinoIcons.mic_slash_fill,
+                  icon: isMicEnabled ? CupertinoIcons.mic_fill : CupertinoIcons.mic_slash_fill,
                   color: isMicEnabled ? Colors.white : Colors.redAccent,
                   onTap: () async {
                     await notifier.toggleMicrophone();
                     // 强制刷新 UI
-                    ref.invalidate(agoraHostServiceProvider(roomID));
+                    ref.invalidate(anchorServiceProvider(roomID));
                   },
                 ),
                 // 美颜控制
@@ -106,12 +98,7 @@ class _CameraActionControls extends ConsumerWidget {
   }
 
   void _showBeautyPanel(BuildContext context) {
-    showModalBottomSheet(
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      context: context,
-      builder: (context) => const BeautyControlPanel(),
-    );
+    showModalBottomSheet(isScrollControlled: true, backgroundColor: Colors.white, context: context, builder: (context) => const BeautyControlPanel());
   }
 }
 
@@ -119,11 +106,7 @@ class _PanelIconButton extends StatelessWidget {
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
-  const _PanelIconButton({
-    required this.icon,
-    required this.color,
-    required this.onTap,
-  });
+  const _PanelIconButton({required this.icon, required this.color, required this.onTap});
 
   @override
   Widget build(BuildContext context) {

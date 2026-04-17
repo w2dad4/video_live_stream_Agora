@@ -27,6 +27,7 @@ class FriendRequestNotifier extends AsyncNotifier<List<FriendRequestModel>> {
     required String targetAvatar,
   }) async {
     final me = ref.read(meProvider);
+    if (me == null) return '用户未登录';
     final myId = me.uid?.trim() ?? 'self';
     if (targetCatId.trim().isEmpty) return '猫猫号不能为空';
     if (targetCatId.trim() == myId) return '不能添加自己';
@@ -62,6 +63,7 @@ class FriendRequestNotifier extends AsyncNotifier<List<FriendRequestModel>> {
 
   Future<void> accept(String requestId) async {
     final me = ref.read(meProvider);
+    if (me == null) return;
     final myId = me.uid?.trim() ?? 'self';
     final all = await SocialLocalStorage.loadFriendRequests();
     final idx = all.indexWhere((r) => r.id == requestId);
@@ -87,6 +89,7 @@ class FriendRequestNotifier extends AsyncNotifier<List<FriendRequestModel>> {
 
   Future<void> reject(String requestId) async {
     final me = ref.read(meProvider);
+    if (me == null) return;
     final myId = me.uid?.trim() ?? 'self';
     final all = await SocialLocalStorage.loadFriendRequests();
     final idx = all.indexWhere((r) => r.id == requestId);
@@ -102,7 +105,7 @@ class FriendRequestNotifier extends AsyncNotifier<List<FriendRequestModel>> {
 /// 发给我的待处理申请
 final incomingFriendRequestsProvider = Provider<List<FriendRequestModel>>((ref) {
   final me = ref.watch(meProvider);
-  final myId = me.uid?.trim() ?? 'self';
+  final myId = me?.uid?.trim() ?? 'self';
   final async = ref.watch(friendRequestListProvider);
   return async.maybeWhen(
     data: (list) => list
@@ -116,7 +119,7 @@ final incomingFriendRequestsProvider = Provider<List<FriendRequestModel>>((ref) 
 /// 我发出的待处理申请
 final outgoingPendingProvider = Provider<List<FriendRequestModel>>((ref) {
   final me = ref.watch(meProvider);
-  final myId = me.uid?.trim() ?? 'self';
+  final myId = me?.uid?.trim() ?? 'self';
   final async = ref.watch(friendRequestListProvider);
   return async.maybeWhen(
     data: (list) => list
