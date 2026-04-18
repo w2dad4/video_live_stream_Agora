@@ -20,28 +20,10 @@ class AgoraPreviewState {
   final bool isMicOn;
   final LiveQuality quality;
 
-  const AgoraPreviewState({
-    this.isInitialized = false,
-    this.isPreviewing = false,
-    this.isCameraOn = true,
-    this.isMicOn = true,
-    this.quality = LiveQuality.fhd1080p,
-  });
+  const AgoraPreviewState({this.isInitialized = false, this.isPreviewing = false, this.isCameraOn = true, this.isMicOn = true, this.quality = LiveQuality.fhd1080p});
 
-  AgoraPreviewState copyWith({
-    bool? isInitialized,
-    bool? isPreviewing,
-    bool? isCameraOn,
-    bool? isMicOn,
-    LiveQuality? quality,
-  }) {
-    return AgoraPreviewState(
-      isInitialized: isInitialized ?? this.isInitialized,
-      isPreviewing: isPreviewing ?? this.isPreviewing,
-      isCameraOn: isCameraOn ?? this.isCameraOn,
-      isMicOn: isMicOn ?? this.isMicOn,
-      quality: quality ?? this.quality,
-    );
+  AgoraPreviewState copyWith({bool? isInitialized, bool? isPreviewing, bool? isCameraOn, bool? isMicOn, LiveQuality? quality}) {
+    return AgoraPreviewState(isInitialized: isInitialized ?? this.isInitialized, isPreviewing: isPreviewing ?? this.isPreviewing, isCameraOn: isCameraOn ?? this.isCameraOn, isMicOn: isMicOn ?? this.isMicOn, quality: quality ?? this.quality);
   }
 }
 
@@ -53,34 +35,41 @@ class AgoraPreviewService extends StateNotifier<AsyncValue<AgoraPreviewState>> {
 
   AgoraPreviewService(this.ref) : super(const AsyncValue.loading());
 
-  /// 初始化并启动预览
+  /// 拆分初始化：先请求权限，再初始化引擎
   Future<void> initialize() async {
     try {
-      // 1. 请求权限
+      // 1. 先请求权限（阻塞操作，优先执行）
       await [Permission.camera, Permission.microphone].request();
 
-      // 2. 获取引擎（使用 AgoraEngineManager 单例）
+      // 2. 异步初始化引擎（不阻塞UI）
+      _initEngineAsync();
+    } catch (e, stack) {
+      debugPrint('❌ [AgoraPreview] 权限请求失败: $e');
+      state = AsyncValue.error(e, stack);
+    }
+  }
+
+  /// 异步初始化引擎（不阻塞主线程）
+  Future<void> _initEngineAsync() async {
+    try {
+      // 获取引擎（使用 AgoraEngineManager 单例）
       _engine = await AgoraEngineManager.getEngine();
 
-      // 3. 配置视频编码（使用当前选择的画质）
+      // 配置视频编码（使用当前选择的画质）
       final quality = ref.read(currentQualityProvider);
       await _updateVideoConfig(quality);
 
-      // 4. 配置角色为 broadcaster（但先不加入频道）
+      // 配置角色为 broadcaster（但先不加入频道）
       await _engine!.setClientRole(role: ClientRoleType.clientRoleBroadcaster);
 
-      // 5. 开启本地预览
+      // 开启本地预览
       await _engine!.startPreview();
 
-      state = AsyncValue.data(AgoraPreviewState(
-        isInitialized: true,
-        isPreviewing: true,
-        quality: quality,
-      ));
+      state = AsyncValue.data(AgoraPreviewState(isInitialized: true, isPreviewing: true, quality: quality));
 
       debugPrint('✅ [AgoraPreview] 预览已启动');
     } catch (e, stack) {
-      debugPrint('❌ [AgoraPreview] 启动失败: $e');
+      debugPrint('❌ [AgoraPreview] 引擎初始化失败: $e');
       state = AsyncValue.error(e, stack);
     }
   }
@@ -89,14 +78,7 @@ class AgoraPreviewService extends StateNotifier<AsyncValue<AgoraPreviewState>> {
   Future<void> _updateVideoConfig(LiveQuality quality) async {
     if (_engine == null) return;
 
-    await _engine!.setVideoEncoderConfiguration(
-      VideoEncoderConfiguration(
-        dimensions: quality.videoDimensions,
-        frameRate: quality.fps,
-        bitrate: quality.videoBitrate,
-        orientationMode: OrientationMode.orientationModeAdaptive,
-      ),
-    );
+    await _engine!.setVideoEncoderConfiguration(VideoEncoderConfiguration(dimensions: quality.videoDimensions, frameRate: quality.fps, bitrate: quality.videoBitrate, orientationMode: OrientationMode.orientationModeAdaptive));
   }
 
   /// 切换摄像头
@@ -144,12 +126,16 @@ class AgoraPreviewService extends StateNotifier<AsyncValue<AgoraPreviewState>> {
     }
   }
 
-  /// 获取本地视频视图
+  /// 获取本地视频视图（确保有明确尺寸）
   Widget getLocalVideoView() {
-    return AgoraVideoView(
-      controller: VideoViewController(
-        rtcEngine: _engine!,
-        canvas: const VideoCanvas(uid: 0), // uid=0 表示本地视频
+    return SizedBox(
+      width: double.infinity,
+      height: double.infinity,
+      child: AgoraVideoView(
+        controller: VideoViewController(
+          rtcEngine: _engine!,
+          canvas: const VideoCanvas(uid: 0), // uid=0 表示本地视频
+        ),
       ),
     );
   }

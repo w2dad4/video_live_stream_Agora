@@ -59,6 +59,8 @@ class _NumberLoginState extends ConsumerState<NumberLoginPage> with SingleTicker
     final password = _passwordController.text;
     final confirmPassword = _confirmPasswordController.text;
 
+    final isSmsLoginOnly = password.isEmpty && confirmPassword.isEmpty;
+
     // 验证手机号
     final phoneRegex = RegExp(r'^1\d{10}$');
     if (!phoneRegex.hasMatch(phone)) {
@@ -69,6 +71,11 @@ class _NumberLoginState extends ConsumerState<NumberLoginPage> with SingleTicker
     // 验证验证码
     if (code.length != 6 || !RegExp(r'^\d{6}$').hasMatch(code)) {
       ToastUtil.showRedError(context, '格式错误', '请输入6位数字验证码');
+      return;
+    }
+
+    if (isSmsLoginOnly) {
+      ref.read(smsLoginProvider.notifier).loginWithSms(phone, code);
       return;
     }
 
@@ -98,17 +105,21 @@ class _NumberLoginState extends ConsumerState<NumberLoginPage> with SingleTicker
     final smsCodeState = ref.watch(smsCodeProvider);
     // 监听验证码注册状态
     final smsRegisterState = ref.watch(smsRegisterProvider);
+    // 监听验证码登录状态
+    final smsLoginState = ref.watch(smsLoginProvider);
 
     // 监听注册结果 - 注册成功后设置用户ID并跳转到引导页
     ref.listen<AsyncValue<void>>(smsRegisterProvider, (previous, next) {
       next.whenOrNull(
         data: (_) async {
+          // 从本地存储读取UID（注册时已保存）
+          final userId = await ensureUserId(phone: _phoneController.text.trim());
+
           // 设置当前用户ID，使userDataProvider能加载用户数据
-          final phone = _phoneController.text.trim();
-          ref.read(currentUserIdProvider.notifier).state = phone;
+          ref.read(currentUserIdProvider.notifier).state = userId;
 
           // 初始化用户数据（从本地存储）
-          final userNotifier = ref.read(userDataProvider(phone).notifier);
+          final userNotifier = ref.read(userDataProvider(userId).notifier);
           await userNotifier.loadUserData();
 
           if (mounted) {
@@ -116,6 +127,23 @@ class _NumberLoginState extends ConsumerState<NumberLoginPage> with SingleTicker
           }
         },
         error: (error, stackTrace) => ToastUtil.showRedError(context, '注册失败', error.toString()),
+      );
+    });
+
+    // 监听验证码登录结果 - 老用户按资料完成状态分流
+    ref.listen<AsyncValue<void>>(smsLoginProvider, (previous, next) {
+      next.whenOrNull(
+        data: (_) async {
+          final userId = await ensureUserId();
+          ref.read(currentUserIdProvider.notifier).state = userId;
+          await ref.read(userDataProvider(userId).notifier).loadUserData();
+          final isNewUser = await readIsNewUser(userId: userId);
+          final completed = await readProfileCompleted(userId: userId);
+          if (!mounted) return;
+          // 新用户或未完善资料的用户进入资料完善页，老用户直接进入首页
+          context.goNamed((isNewUser || !completed) ? 'Onboarding' : 'Mylivestream');
+        },
+        error: (error, stackTrace) => ToastUtil.showRedError(context, '登录失败', error.toString()),
       );
     });
 
@@ -173,7 +201,7 @@ class _NumberLoginState extends ConsumerState<NumberLoginPage> with SingleTicker
             child: SafeArea(
               child: SingleChildScrollView(
                 physics: const NeverScrollableScrollPhysics(),
-                child: Padding(padding: const EdgeInsets.symmetric(horizontal: 25), child: _buildLoginForm(smsCodeState, smsRegisterState)),
+                child: Padding(padding: const EdgeInsets.symmetric(horizontal: 25), child: _buildLoginForm(smsCodeState, smsRegisterState, smsLoginState)),
               ),
             ),
           ),
@@ -198,7 +226,7 @@ class _NumberLoginState extends ConsumerState<NumberLoginPage> with SingleTicker
   }
 
   // 注册表单
-  Widget _buildLoginForm(SmsCodeState smsCodeState, AsyncValue<void> smsRegisterState) {
+  Widget _buildLoginForm(SmsCodeState smsCodeState, AsyncValue<void> smsRegisterState, AsyncValue<void> smsLoginState) {
     return Container(
       padding: const EdgeInsets.only(top: 20, bottom: 10),
       child: IntrinsicHeight(
@@ -266,7 +294,7 @@ class _NumberLoginState extends ConsumerState<NumberLoginPage> with SingleTicker
                 keyboardType: TextInputType.visiblePassword,
                 decoration: const InputDecoration(
                   labelText: '设置密码',
-                  hintText: '8-20位，包含字母和数字',
+                  hintText: '留空可直接短信登录',
                   border: InputBorder.none,
                   prefixIcon: Icon(Icons.lock_outline, color: Colors.white70),
                 ),
@@ -281,7 +309,7 @@ class _NumberLoginState extends ConsumerState<NumberLoginPage> with SingleTicker
                 keyboardType: TextInputType.visiblePassword,
                 decoration: const InputDecoration(
                   labelText: '确认密码',
-                  hintText: '再次输入密码',
+                  hintText: '注册时再次输入密码',
                   border: InputBorder.none,
                   prefixIcon: Icon(Icons.lock, color: Colors.white70),
                 ),
@@ -289,7 +317,7 @@ class _NumberLoginState extends ConsumerState<NumberLoginPage> with SingleTicker
             ),
             const SizedBox(height: 40),
             // 注册按钮
-            _buildActionButtons(smsRegisterState),
+            _buildActionButtons(smsRegisterState, smsLoginState),
             const Spacer(),
             // 底部链接
             _buildBottomLinks(),
@@ -320,7 +348,9 @@ class _NumberLoginState extends ConsumerState<NumberLoginPage> with SingleTicker
   }
 
   // 注册按钮
-  Widget _buildActionButtons(AsyncValue<void> smsRegisterState) {
+  Widget _buildActionButtons(AsyncValue<void> smsRegisterState, AsyncValue<void> smsLoginState) {
+    final isBusy = smsRegisterState.isLoading || smsLoginState.isLoading;
+    final isSmsLoginOnly = _passwordController.text.trim().isEmpty && _confirmPasswordController.text.trim().isEmpty;
     return SizedBox(
       width: double.infinity,
       height: 55,
@@ -330,11 +360,11 @@ class _NumberLoginState extends ConsumerState<NumberLoginPage> with SingleTicker
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
           elevation: 0,
         ),
-        onPressed: smsRegisterState.isLoading ? null : _handleLogin,
-        child: smsRegisterState.isLoading
+        onPressed: isBusy ? null : _handleLogin,
+        child: isBusy
             ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-            : const Text(
-                '注 册',
+            : Text(
+                isSmsLoginOnly ? '登 录' : '注 册',
                 style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold),
               ),
       ),

@@ -59,6 +59,9 @@ class _LiveStatsConfig {
   static const String _serverFromDefine = String.fromEnvironment('LIVE_SERVER_IP', defaultValue: '');
   static const int unifiedPort = 8080;
 
+  /// 设置为 true 可禁用 WebSocket，使用模拟数据（适合没有后端时调试UI）
+  static const bool bypassWebSocket = true;
+
   static String get serverIP {
     if (_serverFromDefine.isNotEmpty) return _serverFromDefine;
     if (Platform.isAndroid || Platform.isIOS) return '192.168.1.18';
@@ -89,11 +92,25 @@ class LiveHistoryNotifier extends StateNotifier<List<LiveRecord>> {
   LiveStatsSocketStatus get status => _status;
 
   void _initWebSocket() {
+    // bypass 模式：不连接 WebSocket，使用模拟数据
+    if (_LiveStatsConfig.bypassWebSocket) {
+      debugPrint('📊 [LiveStats] bypass模式：使用模拟数据');
+      _loadMockData();
+      return;
+    }
     connect();
+  }
+
+  /// 加载模拟数据（bypass模式）
+  void _loadMockData() {
+    // 模拟一些直播记录数据
+    state = [LiveRecord(id: 'mock_1', startTime: DateTime.now().subtract(const Duration(hours: 2)), endTime: DateTime.now().subtract(const Duration(hours: 1)), diamonds: 120, viewers: 45, newFans: 3, title: '今日直播')];
   }
 
   /// 建立 WebSocket 连接
   void connect() {
+    if (_LiveStatsConfig.bypassWebSocket) return;
+
     if (_status == LiveStatsSocketStatus.connecting || _status == LiveStatsSocketStatus.connected) {
       return;
     }
@@ -215,46 +232,81 @@ final liveHistoryProvider = StateNotifierProvider<LiveHistoryNotifier, List<Live
   return LiveHistoryNotifier(ref);
 });
 
-/// 根据选中的时间区间计算统计数据
-final liveStatsProvider = Provider<LiveStats>((ref) {
-  final selectedDays = ref.watch(selectedDaysProvider);
-  final allRecords = ref.watch(liveHistoryProvider);
-  final now = DateTime.now();
-
-  DateTime startDate;
-  DateTime endDate;
-
-  if (selectedDays == 0) {
-    // 今日：从今天 00:00:00 到 23:59:59
-    startDate = DateTime(now.year, now.month, now.day);
-    endDate = startDate.add(Duration(days: 1)).subtract(Duration(seconds: 1));
-  } else {
-    // 前N天：从今天往前(N-1)天，到今天 23:59:59
-    // 前7天 = 今天 + 往前6天（共7天）
-    // 前30天 = 今天 + 往前29天（共30天）
-    startDate = DateTime(now.year, now.month, now.day).subtract(Duration(days: selectedDays - 1));
-    endDate = DateTime(now.year, now.month, now.day).add(Duration(days: 1)).subtract(Duration(seconds: 1));
+/// 直播统计数据 Notifier - 根据 selectedDays 动态加载数据
+class LiveStatsNotifier extends StateNotifier<AsyncValue<LiveStats>> {
+  LiveStatsNotifier(this.ref) : super(const AsyncValue.loading()) {
+    // 监听 selectedDays 变化
+    ref.listen<int>(selectedDaysProvider, (previous, next) {
+      if (previous != next) {
+        loadData(next);
+      }
+    });
+    // 初始加载数据
+    loadData(ref.read(selectedDaysProvider));
   }
 
-  // 过滤时间区间内的直播记录
-  final filteredRecords = allRecords.where((record) {
-    return record.startTime.isAfter(startDate.subtract(Duration(seconds: 1))) && record.startTime.isBefore(endDate.add(Duration(seconds: 1)));
-  }).toList();
+  final Ref ref;
 
-  // 计算统计数据
-  int totalDiamonds = 0;
-  int totalViewers = 0;
-  int totalFans = 0;
-  int totalDuration = 0;
+  /// 根据选中的天数加载数据，如果有后端，只需要修改loadData（）方法即可
+  Future<void> loadData(int days) async {
+    state = const AsyncValue.loading();
 
-  for (final record in filteredRecords) {
-    totalDiamonds += record.diamonds;
-    totalViewers += record.viewers;
-    totalFans += record.newFans;
-    totalDuration += record.durationMinutes;
+    try {
+      // 模拟网络请求延迟
+      await Future.delayed(const Duration(milliseconds: 300));
+
+      // 生成模拟数据
+      final stats = _generateMockStats(days);
+
+      state = AsyncValue.data(stats);
+      debugPrint('📊 [LiveStats] 加载数据: $days 天, 钻石: ${stats.diamonds}, 观众: ${stats.viewers}');
+    } catch (e, stack) {
+      debugPrint('❌ [LiveStats] 加载失败: $e');
+      state = AsyncValue.error(e, stack);
+    }
   }
 
-  return LiveStats(diamonds: totalDiamonds, viewers: totalViewers, fans: totalFans, durationMinutes: totalDuration);
+  /// 根据天数生成模拟统计数据，，如果有后端只需要把_generateMockStats替换为http请求
+  LiveStats _generateMockStats(int days) {
+    final random = DateTime.now().millisecond;
+
+    int diamonds;
+    int viewers;
+    int fans;
+    int duration;
+
+    if (days == 0) {
+      // 今日：较小的数据
+      diamonds = 50 + (random % 100);
+      viewers = 20 + (random % 50);
+      fans = 5 + (random % 15);
+      duration = 30 + (random % 90);
+    } else if (days == 7) {
+      // 前7天：中等数据
+      diamonds = 500 + (random % 500);
+      viewers = 200 + (random % 200);
+      fans = 30 + (random % 50);
+      duration = 200 + (random % 300);
+    } else {
+      // 前30天：较大数据
+      diamonds = 2000 + (random % 1000);
+      viewers = 800 + (random % 500);
+      fans = 100 + (random % 200);
+      duration = 800 + (random % 1000);
+    }
+
+    return LiveStats(diamonds: diamonds, viewers: viewers, fans: fans, durationMinutes: duration);
+  }
+
+  /// 手动刷新数据
+  void refresh() {
+    loadData(ref.read(selectedDaysProvider));
+  }
+}
+
+/// 直播统计数据 Provider - 异步加载
+final liveStatsProvider = StateNotifierProvider<LiveStatsNotifier, AsyncValue<LiveStats>>((ref) {
+  return LiveStatsNotifier(ref);
 });
 
 // ==================== UI 组件 ====================
@@ -334,8 +386,7 @@ class LiveStreamingData extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final selectedDays = ref.watch(selectedDaysProvider);
-    final stats = ref.watch(liveStatsProvider);
-    final data = stats.toDisplayMap();
+    final statsAsync = ref.watch(liveStatsProvider);
 
     return Container(
       margin: EdgeInsets.only(left: 10, right: 10, bottom: 10),
@@ -370,7 +421,16 @@ class LiveStreamingData extends ConsumerWidget {
           ),
           // 2. 中间：数值行
           Expanded(
-            child: Row(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.spaceAround, children: [_buildDataValue(data['diamonds']!), _buildDataValue(data['viewers']!), _buildDataValue(data['fans']!), _buildDataValue(data['duration']!)]),
+            child: statsAsync.when(
+              loading: () => const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))),
+              error: (error, stack) => const Center(
+                child: Text('加载失败', style: TextStyle(fontSize: 12, color: Colors.grey)),
+              ),
+              data: (stats) {
+                final data = stats.toDisplayMap();
+                return Row(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.spaceAround, children: [_buildDataValue(data['diamonds']!), _buildDataValue(data['viewers']!), _buildDataValue(data['fans']!), _buildDataValue(data['duration']!)]);
+              },
+            ),
           ),
           // 3. 底部：文字描述行
           Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [_buildLabel('收获钻石'), _buildLabel('观众人数'), _buildLabel('新增粉丝'), _buildLabel('开播时长')]),

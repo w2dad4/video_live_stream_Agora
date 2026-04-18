@@ -38,22 +38,15 @@ class AnchorState {
 class AnchorNotifier extends StateNotifier<AnchorState> {
   AnchorNotifier() : super(AnchorState());
 
-  // 初始化获取定位和数据
+  // 拆分初始化：先获取数据，再异步获取定位
   Future<void> initData() async {
     if (state.isLoading) return;
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      // 定位只作为“附近排序”辅助，不应阻塞页面展示
-      await _getValidatedPosition();
-    } catch (e) {
-      debugPrint('定位流程降级: $e');
-    }
-
-    try {
-      // 从后端获取直播房间列表
+      // 1. 先获取直播房间列表（优先显示内容）
       final rooms = await LiveRoomService.getLiveRooms();
-      
+
       // 转换为 NearbyAnchor 格式（模拟距离）
       final list = rooms.map((room) {
         final id = room['id'] ?? '';
@@ -64,13 +57,26 @@ class AnchorNotifier extends StateNotifier<AnchorState> {
           id: id,
         );
       }).toList();
-      
+
       // 按距离排序
       list.sort((a, b) => a.distance.compareTo(b.distance));
 
       state = state.copyWith(anchors: list, isLoading: false);
+
+      // 2. 异步获取定位（不阻塞UI）
+      _initLocationAsync();
     } catch (e) {
       state = state.copyWith(error: e.toString(), isLoading: false);
+    }
+  }
+
+  // 异步初始化定位（不阻塞主线程）
+  Future<void> _initLocationAsync() async {
+    try {
+      await _getValidatedPosition();
+      debugPrint('✅ 定位获取成功');
+    } catch (e) {
+      debugPrint('定位流程降级: $e');
     }
   }
 
@@ -96,15 +102,9 @@ class AnchorNotifier extends StateNotifier<AnchorState> {
     if (last != null) return last;
 
     try {
-      return await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.lowest,
-        timeLimit: const Duration(seconds: 28),
-      );
+      return await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.lowest, timeLimit: const Duration(seconds: 28));
     } on TimeoutException {
-      return await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.medium,
-        timeLimit: const Duration(seconds: 35),
-      );
+      return await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.medium, timeLimit: const Duration(seconds: 35));
     }
   }
 }
@@ -124,7 +124,6 @@ class VideoDiscoverPage extends ConsumerStatefulWidget {
 }
 
 class _VideoDiscoverPageState extends ConsumerState<VideoDiscoverPage> {
-
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(anchorProvider);

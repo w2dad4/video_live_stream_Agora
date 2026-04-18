@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:dio/dio.dart';
 import 'package:video_live_stream/config/toppop-up.dart';
+import 'package:video_live_stream/config/login/login_provider.dart';
 import 'package:video_live_stream/features/auth/auth_provider.dart';
 import 'package:video_live_stream/live_stream_message/contact/contact_UI/constants.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -25,10 +26,18 @@ class ProfileCompletionState {
 
   ProfileCompletionState({this.avatarPath, this.avatarUrl = '', this.nickname = '', this.gender, this.isSubmitting = false, this.error});
 
-  bool get canSubmit => avatarPath != null && nickname.isNotEmpty && gender != null && !isSubmitting;
+  bool get hasAvatar => (avatarPath != null && avatarPath!.isNotEmpty) || avatarUrl.isNotEmpty;
+  bool get canSubmit => hasAvatar && nickname.isNotEmpty && !isSubmitting;
 
   ProfileCompletionState copyWith({String? avatarPath, String? avatarUrl, String? nickname, String? gender, bool? isSubmitting, String? error}) {
-    return ProfileCompletionState(avatarPath: avatarPath ?? this.avatarPath, avatarUrl: avatarUrl ?? this.avatarUrl, nickname: nickname ?? this.nickname, gender: gender ?? this.gender, isSubmitting: isSubmitting ?? this.isSubmitting, error: error);
+    return ProfileCompletionState(
+      avatarPath: avatarPath ?? this.avatarPath,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+      nickname: nickname ?? this.nickname,
+      gender: gender ?? this.gender, //
+      isSubmitting: isSubmitting ?? this.isSubmitting,
+      error: error,
+    );
   }
 }
 
@@ -52,32 +61,43 @@ class ProfileCompletionNotifier extends StateNotifier<ProfileCompletionState> {
     state = state.copyWith(isSubmitting: true, error: null);
 
     try {
+      final localAvatarPath = state.avatarPath?.trim() ?? '';
+      final fallbackAvatar = state.avatarUrl.trim().isNotEmpty ? state.avatarUrl.trim() : 'assets/image/002.png';
+
       if (LiveConfig.bypassLoginApi) {
         // 开发模式：模拟上传成功
         await Future.delayed(const Duration(seconds: 1));
 
         // 更新本地用户数据
-        _updateLocalUserData(userId, 'assets/image/002.png');
+        _updateLocalUserData(userId, localAvatarPath.isNotEmpty ? localAvatarPath : fallbackAvatar, name: state.nickname, gender: state.gender);
 
-        state = state.copyWith(isSubmitting: false, avatarUrl: 'assets/image/002.png');
+        state = state.copyWith(isSubmitting: false, avatarUrl: localAvatarPath.isNotEmpty ? localAvatarPath : fallbackAvatar);
         return true;
       }
 
-      // 1. 上传头像到后端
-      final String uploadUrl = 'http://${LiveConfig.serverIP}:8000/api/v1/uploadAvatar';
-      final avatarFile = File(state.avatarPath!);
+      String? avatarUrl = fallbackAvatar;
 
-      final formData = FormData.fromMap({'avatar': await MultipartFile.fromFile(avatarFile.path, filename: 'avatar_$userId.jpg')});
+      // 1. 上传头像到后端（仅在选择了本地新头像时上传）
+      if (localAvatarPath.isNotEmpty) {
+        final String uploadUrl = 'http://${LiveConfig.serverIP}:8000/api/v1/uploadAvatar';
+        final avatarFile = File(localAvatarPath);
 
-      final uploadResponse = await _dio.post(
-        uploadUrl,
-        data: formData,
-        options: Options(headers: {'Authorization': 'Bearer $token'}),
-      );
+        final formData = FormData.fromMap({'avatar': await MultipartFile.fromFile(avatarFile.path, filename: 'avatar_$userId.jpg')});
 
-      String? avatarUrl;
-      if (uploadResponse.statusCode == 200 && uploadResponse.data['code'] == 0) {
-        avatarUrl = uploadResponse.data['data']?['url'];
+        final uploadResponse = await _dio.post(
+          uploadUrl,
+          data: formData,
+          options: Options(headers: {'Authorization': 'Bearer $token'}),
+        );
+
+        if (uploadResponse.statusCode == 200 && uploadResponse.data['code'] == 0) {
+          avatarUrl = (uploadResponse.data['data']?['url']?.toString() ?? '').trim();
+          if (avatarUrl.isEmpty) {
+            avatarUrl = localAvatarPath;
+          }
+        } else {
+          avatarUrl = localAvatarPath;
+        }
       }
 
       // 2. 提交完整资料
@@ -90,12 +110,9 @@ class ProfileCompletionNotifier extends StateNotifier<ProfileCompletionState> {
 
       if (response.statusCode == 200 && response.data['code'] == 0) {
         // 更新本地用户数据
-        final userData = response.data['data']?['user'];
-        if (userData != null) {
-          _updateLocalUserData(userId, avatarUrl ?? state.avatarPath!, name: state.nickname, gender: state.gender);
-        }
+        _updateLocalUserData(userId, avatarUrl.isEmpty ? fallbackAvatar : avatarUrl, name: state.nickname, gender: state.gender);
 
-        state = state.copyWith(isSubmitting: false, avatarUrl: avatarUrl ?? state.avatarPath!);
+        state = state.copyWith(isSubmitting: false, avatarUrl: avatarUrl.isEmpty ? fallbackAvatar : avatarUrl);
         return true;
       } else {
         throw response.data['message'] ?? '资料完善失败';
@@ -118,9 +135,21 @@ class ProfileCompletionNotifier extends StateNotifier<ProfileCompletionState> {
     final userNotifier = ref.read(userDataProvider(userId).notifier);
     final currentData = ref.read(userDataProvider(userId));
 
-    if (currentData != null) {
-      userNotifier.updateUserData(currentData.copyWith(name: name ?? currentData.name, avatar: avatar, gender: gender ?? currentData.gender));
+    if (currentData == null) {
+      userNotifier.updateUserData(
+        UserData(
+          uid: userId,
+          name: (name ?? '').trim().isEmpty ? '用户_$userId' : name!.trim(), //
+          avatar: avatar,
+          gender: gender ?? '未设置',
+          region: '未设置',
+          signature: '这个人很懒，还没有签名',
+        ),
+      );
+      return;
     }
+
+    userNotifier.updateUserData(currentData.copyWith(name: name ?? currentData.name, avatar: avatar, gender: gender ?? currentData.gender));
   }
 }
 
@@ -134,6 +163,8 @@ class OnboardingPage extends ConsumerStatefulWidget {
 
 class _OnboardingPageState extends ConsumerState<OnboardingPage> {
   final TextEditingController _nicknameController = TextEditingController();
+  String _userId = '';
+  bool _isInitializing = true;
 
   @override
   void initState() {
@@ -141,12 +172,44 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
     _nicknameController.addListener(() {
       ref.read(profileCompletionProvider.notifier).setNickname(_nicknameController.text);
     });
+    _initUserData();
   }
 
   @override
   void dispose() {
     _nicknameController.dispose();
     super.dispose();
+  }
+
+  Future<void> _initUserData() async {
+    final userId = await ensureUserId();
+    if (!mounted) return;
+
+    ref.read(currentUserIdProvider.notifier).state = userId;
+    final notifier = ref.read(userDataProvider(userId).notifier);
+    await notifier.loadUserData();
+    final data = ref.read(userDataProvider(userId));
+
+    if (!mounted) return;
+    setState(() {
+      _userId = userId;
+      _isInitializing = false;
+    });
+
+    if (data != null) {
+      if (data.name.trim().isNotEmpty && data.name != '用户_$userId') {
+        _nicknameController.text = data.name;
+      }
+      if ((data.avatar ?? '').trim().isNotEmpty) {
+        ref.read(profileCompletionProvider.notifier).setAvatarUrl(data.avatar!.trim());
+      }
+      final gender = (data.gender ?? '').trim();
+      if (gender == 'male' || gender == 'female') {
+        ref.read(profileCompletionProvider.notifier).setGender(gender);
+      }
+    } else {
+      ref.read(profileCompletionProvider.notifier).setAvatarUrl('assets/image/002.png');
+    }
   }
 
   /// 验证昵称
@@ -170,15 +233,17 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
     }
   }
 
+  String _resolveAvatarToSave(ProfileCompletionState profileState) {
+    final local = profileState.avatarPath?.trim() ?? '';
+    if (local.isNotEmpty) return local;
+    final remoteOrAsset = profileState.avatarUrl.trim();
+    if (remoteOrAsset.isNotEmpty) return remoteOrAsset;
+    return 'assets/image/002.png';
+  }
+
   /// 提交资料
   void _submit() async {
     final profileState = ref.read(profileCompletionProvider);
-
-    // 验证头像
-    if (profileState.avatarPath == null) {
-      ToastUtil.showRedError(context, '请上传头像', '头像为必填项');
-      return;
-    }
 
     // 验证昵称
     final nicknameError = _validateNickname(profileState.nickname);
@@ -187,15 +252,9 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
       return;
     }
 
-    // 验证性别
-    if (profileState.gender == null) {
-      ToastUtil.showRedError(context, '请选择性别', '性别为必填项');
-      return;
-    }
-
     // 获取当前用户ID和token
     final prefs = await SharedPreferences.getInstance();
-    final userId = prefs.getString('user_account') ?? '';
+    final userId = prefs.getString('user_id') ?? '';
     final token = prefs.getString('token') ?? '';
 
     if (userId.isEmpty) {
@@ -206,6 +265,13 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
     // 提交
     final success = await ref.read(profileCompletionProvider.notifier).submit(userId, token);
     if (success && mounted) {
+      await writeProfileCompleted(userId, true);
+      await writeIsNewUser(userId, false);
+      final avatar = _resolveAvatarToSave(profileState);
+      final currentData = ref.read(userDataProvider(userId));
+      if (currentData != null) {
+        ref.read(userDataProvider(userId).notifier).updateUserData(currentData.copyWith(name: profileState.nickname, avatar: avatar, gender: profileState.gender));
+      }
       ToastUtil.showGreenSuccess(context, '资料完善成功', '欢迎加入小猫啵啵');
       context.goNamed('Mylivestream');
     }
@@ -214,6 +280,13 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
   @override
   Widget build(BuildContext context) {
     final profileState = ref.watch(profileCompletionProvider);
+
+    if (_isInitializing) {
+      return const Scaffold(
+        backgroundColor: Color(0xff1A1A2E),
+        body: Center(child: CircularProgressIndicator(color: Color(0xffFF5391))),
+      );
+    }
 
     return PopScope(
       canPop: false, // 禁止返回，强制完成资料
@@ -255,6 +328,10 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                     _buildNicknameInput(profileState),
                     const SizedBox(height: 20),
 
+                    // UID 只读展示
+                    _buildUidDisplay(),
+                    const SizedBox(height: 20),
+
                     // 性别选择
                     _buildGenderSelector(profileState),
                     const SizedBox(height: 50),
@@ -281,9 +358,9 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: Colors.white.withValues(alpha: 0.1),
-          border: Border.all(color: state.avatarPath == null ? Colors.white30 : const Color(0xffFF5391), width: 2),
+          border: Border.all(color: state.hasAvatar ? const Color(0xffFF5391) : Colors.white30, width: 2),
         ),
-        child: state.avatarPath == null
+        child: state.avatarPath == null && state.avatarUrl.isEmpty
             ? const Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -292,16 +369,39 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                   Text('点击上传', style: TextStyle(color: Colors.white60, fontSize: 12)),
                 ],
               )
-            : ClipOval(
-                child: Image.file(
-                  File(state.avatarPath!),
-                  width: 120,
-                  height: 120,
-                  fit: BoxFit.cover,
-                  errorBuilder: (c, e, s) => const Icon(Icons.person, size: 60, color: Colors.white),
-                ),
-              ),
+            : ClipOval(child: _buildAvatarImage(state)),
       ),
+    );
+  }
+
+  Widget _buildAvatarImage(ProfileCompletionState state) {
+    final localPath = state.avatarPath?.trim() ?? '';
+    if (localPath.isNotEmpty) {
+      return Image.file(
+        File(localPath),
+        width: 120,
+        height: 120,
+        fit: BoxFit.cover,
+        errorBuilder: (c, e, s) => const Icon(Icons.person, size: 60, color: Colors.white),
+      );
+    }
+
+    final path = state.avatarUrl.trim();
+    if (path.startsWith('http')) {
+      return Image.network(
+        path,
+        width: 120,
+        height: 120,
+        fit: BoxFit.cover,
+        errorBuilder: (c, e, s) => const Icon(Icons.person, size: 60, color: Colors.white),
+      );
+    }
+    return Image.asset(
+      path,
+      width: 120,
+      height: 120,
+      fit: BoxFit.cover,
+      errorBuilder: (c, e, s) => const Icon(Icons.person, size: 60, color: Colors.white),
     );
   }
 
@@ -327,6 +427,31 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
           hintText: '2-12个字符，支持中英文数字',
           hintStyle: TextStyle(color: Colors.white30, fontSize: 12),
         ),
+      ),
+    );
+  }
+
+  Widget _buildUidDisplay() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.perm_identity, color: Colors.white60),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'UID: ${_userId.isEmpty ? 'unknown' : _userId}',
+              style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
+            ),
+          ),
+          const Text('不可修改', style: TextStyle(color: Colors.white60, fontSize: 12)),
+        ],
       ),
     );
   }
@@ -387,7 +512,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
 
   /// 提交按钮
   Widget _buildSubmitButton(ProfileCompletionState state) {
-    final bool isReady = state.avatarPath != null && state.nickname.isNotEmpty && state.gender != null;
+    final bool isReady = state.hasAvatar && state.nickname.isNotEmpty;
 
     return SizedBox(
       width: double.infinity,

@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
@@ -10,6 +12,196 @@ import '../../live_stream_message/contact/contact_UI/constants.dart'; // 导入 
 const String _kUserAccount = 'user_account';
 const String _kIsLoggedIn = 'is_logged_in';
 const String _kUserToken = 'token';
+const String _kUserId = 'user_id';
+const String _kPhoneUidMap = 'phone_uid_map';
+const String _kUsedUids = 'used_uids';
+
+String _profileCompletedKey(String userId) => 'profile_completed_$userId';
+String _isNewUserKey(String userId) => 'is_new_user_$userId';
+
+bool _isValidUid(String uid) => RegExp(r'^\d{7,11}$').hasMatch(uid);
+
+Future<Map<String, String>> _readPhoneUidMap(SharedPreferences prefs) async {
+  final raw = prefs.getString(_kPhoneUidMap);
+  if (raw == null || raw.isEmpty) return {};
+  try {
+    final decoded = (jsonDecode(raw) as Map).cast<String, dynamic>();
+    return decoded.map((k, v) => MapEntry(k, v.toString()));
+  } catch (_) {
+    return {};
+  }
+}
+
+Future<void> _writePhoneUidMap(SharedPreferences prefs, Map<String, String> map) async {
+  await prefs.setString(_kPhoneUidMap, jsonEncode(map));
+}
+
+Future<Set<String>> _readUsedUidSet(SharedPreferences prefs) async {
+  final raw = prefs.getStringList(_kUsedUids);
+  if (raw == null) return <String>{};
+  return raw.toSet();
+}
+
+Future<void> _writeUsedUidSet(SharedPreferences prefs, Set<String> used) async {
+  await prefs.setStringList(_kUsedUids, used.toList(growable: false));
+}
+
+Future<void> _migrateUidRelatedData(SharedPreferences prefs, {required String oldUid, required String newUid}) async {
+  if (oldUid.isEmpty || oldUid == newUid) return;
+
+  final oldProfileKey = 'user_profile_$oldUid';
+  final newProfileKey = 'user_profile_$newUid';
+  if (prefs.containsKey(oldProfileKey) && !prefs.containsKey(newProfileKey)) {
+    final raw = prefs.getString(oldProfileKey);
+    if (raw != null && raw.isNotEmpty) {
+      await prefs.setString(newProfileKey, raw);
+    }
+  }
+
+  final oldCompletedKey = _profileCompletedKey(oldUid);
+  final newCompletedKey = _profileCompletedKey(newUid);
+  if (prefs.containsKey(oldCompletedKey) && !prefs.containsKey(newCompletedKey)) {
+    final completed = prefs.getBool(oldCompletedKey);
+    if (completed != null) {
+      await prefs.setBool(newCompletedKey, completed);
+    }
+  }
+
+  final oldNewUserKey = _isNewUserKey(oldUid);
+  final newNewUserKey = _isNewUserKey(newUid);
+  if (prefs.containsKey(oldNewUserKey) && !prefs.containsKey(newNewUserKey)) {
+    final isNew = prefs.getBool(oldNewUserKey);
+    if (isNew != null) {
+      await prefs.setBool(newNewUserKey, isNew);
+    }
+  }
+}
+
+String _generateUid(Set<String> used) {
+  final random = math.Random();
+  for (int i = 0; i < 5000; i++) {
+    final int length = 7 + random.nextInt(5); // 7~11
+    final first = 1 + random.nextInt(9); // 首位不为0
+    final tail = List.generate(length - 1, (_) => random.nextInt(10).toString()).join();
+    final uid = '$first$tail';
+    if (!used.contains(uid)) return uid;
+  }
+  // 极低概率兜底：取毫秒时间后11位，保证是数字
+  final fallback = DateTime.now().millisecondsSinceEpoch.toString().substring(2, 13);
+  if (!used.contains(fallback)) return fallback;
+  return '${1 + random.nextInt(9)}${DateTime.now().microsecondsSinceEpoch.toString().substring(4, 14)}';
+}
+
+Future<bool> hasLocalUserByPhone(String phone) async {
+  final prefs = await SharedPreferences.getInstance();
+  final map = await _readPhoneUidMap(prefs);
+  return map.containsKey(phone.trim());
+}
+
+Future<String?> readUserIdByPhone(String phone) async {
+  final prefs = await SharedPreferences.getInstance();
+  final map = await _readPhoneUidMap(prefs);
+  final mapped = map[phone.trim()]?.trim() ?? '';
+  if (_isValidUid(mapped)) return mapped;
+  if (mapped.isEmpty) return null;
+  return ensureUserId(phone: phone, preferredId: mapped);
+}
+
+Future<String> ensureUserId({String? preferredId, String? phone}) async {
+  final prefs = await SharedPreferences.getInstance();
+  final normalizedPhone = (phone ?? prefs.getString(_kUserAccount) ?? '').trim();
+  final preferred = (preferredId ?? '').trim();
+  final used = await _readUsedUidSet(prefs);
+
+  if (normalizedPhone.isNotEmpty) {
+    final map = await _readPhoneUidMap(prefs);
+    final mapped = map[normalizedPhone]?.trim() ?? '';
+    final legacyUid = mapped;
+    if (_isValidUid(mapped)) {
+      used.add(mapped);
+      await _writeUsedUidSet(prefs, used);
+      await prefs.setString(_kUserId, mapped);
+      return mapped;
+    }
+
+    String uid;
+    if (_isValidUid(preferred)) {
+      final usedBySamePhone = map[normalizedPhone] == preferred;
+      final usedByOtherPhone = map.entries.any((e) => e.key != normalizedPhone && e.value == preferred);
+      if ((usedBySamePhone || !used.contains(preferred)) && !usedByOtherPhone) {
+        uid = preferred;
+      } else {
+        uid = _generateUid(used);
+      }
+    } else {
+      uid = _generateUid(used);
+    }
+
+    map[normalizedPhone] = uid;
+    used.add(uid);
+    await _writePhoneUidMap(prefs, map);
+    await _writeUsedUidSet(prefs, used);
+    await prefs.setString(_kUserId, uid);
+    await _migrateUidRelatedData(prefs, oldUid: legacyUid, newUid: uid);
+    return uid;
+  }
+
+  final existing = prefs.getString(_kUserId)?.trim() ?? '';
+  if (_isValidUid(existing)) {
+    used.add(existing);
+    await _writeUsedUidSet(prefs, used);
+    return existing;
+  }
+
+  final uid = _isValidUid(preferred) && !used.contains(preferred) ? preferred : _generateUid(used);
+  used.add(uid);
+  await _writeUsedUidSet(prefs, used);
+  await prefs.setString(_kUserId, uid);
+  await _migrateUidRelatedData(prefs, oldUid: existing, newUid: uid);
+  return uid;
+}
+
+Future<void> writeProfileCompleted(String userId, bool completed) async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setBool(_profileCompletedKey(userId), completed);
+}
+
+Future<void> writeIsNewUser(String userId, bool isNewUser) async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setBool(_isNewUserKey(userId), isNewUser);
+}
+
+Future<bool> readIsNewUser({String? userId}) async {
+  final prefs = await SharedPreferences.getInstance();
+  final uid = userId ?? prefs.getString(_kUserId) ?? '';
+  if (uid.isEmpty) return false;
+  return prefs.getBool(_isNewUserKey(uid)) ?? false;
+}
+
+Future<bool> readProfileCompleted({String? userId}) async {
+  final prefs = await SharedPreferences.getInstance();
+  final uid = userId ?? prefs.getString(_kUserId) ?? '';
+  if (uid.isEmpty) return false;
+  final key = _profileCompletedKey(uid);
+  final stored = prefs.getBool(key);
+  if (stored != null) return stored;
+
+  // 兼容老版本：如果本地已有完整资料，则自动视为已完善，避免重复强制引导。
+  final profileRaw = prefs.getString('user_profile_$uid');
+  if (profileRaw != null && profileRaw.isNotEmpty) {
+    try {
+      final profile = (jsonDecode(profileRaw) as Map).cast<String, dynamic>();
+      final name = (profile['name'] ?? '').toString().trim();
+      final avatar = (profile['avatar'] ?? '').toString().trim();
+      final inferred = name.isNotEmpty && name != '用户_$uid' && avatar.isNotEmpty;
+      await prefs.setBool(key, inferred);
+      return inferred;
+    } catch (_) {
+      return false;
+    }
+  }
+  return false;
+}
 
 /// 读取上次登录成功并持久化的手机号（不读密码，密码不落盘）。
 Future<String?> readSavedUserAccount() async {
@@ -23,6 +215,22 @@ Future<String?> readSavedUserAccount() async {
 Future<bool> readIsLoggedIn() async {
   final prefs = await SharedPreferences.getInstance();
   return prefs.getBool(_kIsLoggedIn) ?? false;
+}
+
+/// 读取保存的用户ID
+Future<String?> readUserId() async {
+  final prefs = await SharedPreferences.getInstance();
+  final existing = prefs.getString(_kUserId)?.trim() ?? '';
+  if (_isValidUid(existing)) return existing;
+
+  final phone = prefs.getString(_kUserAccount)?.trim() ?? '';
+  if (phone.isNotEmpty) {
+    return ensureUserId(phone: phone, preferredId: existing);
+  }
+  if (existing.isNotEmpty) {
+    return ensureUserId(preferredId: existing);
+  }
+  return null;
 }
 
 final loginProvider = StateNotifierProvider<LoginNotifier, AsyncValue<void>>((ref) => LoginNotifier());
@@ -52,9 +260,14 @@ class LoginNotifier extends StateNotifier<AsyncValue<void>> {
     try {
       if (LiveConfig.bypassLoginApi) {
         final prefs = await SharedPreferences.getInstance();
+        final isOldUser = await hasLocalUserByPhone(username);
+        final userId = await ensureUserId(phone: username);
         await prefs.setString(_kUserAccount, username);
         await prefs.setBool(_kIsLoggedIn, true);
         await prefs.setString(_kUserToken, 'dev-bypass-token');
+        await writeIsNewUser(userId, !isOldUser);
+        final completed = await readProfileCompleted(userId: userId);
+        await writeProfileCompleted(userId, isOldUser ? completed : false);
         state = const AsyncValue.data(null);
         return;
       }
@@ -68,11 +281,27 @@ class LoginNotifier extends StateNotifier<AsyncValue<void>> {
       // 3. 根据后端返回码处理（假设 0 为成功）
       if (response.statusCode == 200 && response.data['code'] == 0) {
         final prefs = await SharedPreferences.getInstance();
+        final serverUserId = response.data['data']?['userId']?.toString() ?? response.data['userId']?.toString();
+        final userId = await ensureUserId(preferredId: serverUserId, phone: username);
 
         // 核心持久化逻辑
         await prefs.setString(_kUserAccount, username);
         await prefs.setBool(_kIsLoggedIn, true);
         await prefs.setString(_kUserToken, response.data['token'] ?? '');
+
+        // 读取后端返回的新用户标记
+        final dynamic isNewUserRaw = response.data['data']?['isNewUser'] ?? response.data['isNewUser'];
+        final bool isNewUser = isNewUserRaw is bool ? isNewUserRaw : false;
+        await writeIsNewUser(userId, isNewUser);
+
+        // 读取资料完善状态
+        final dynamic profileCompletedRaw = response.data['data']?['profileCompleted'] ?? response.data['profileCompleted'];
+        if (profileCompletedRaw is bool) {
+          await writeProfileCompleted(userId, profileCompletedRaw);
+        } else {
+          final completed = await readProfileCompleted(userId: userId);
+          await writeProfileCompleted(userId, completed);
+        }
 
         state = const AsyncValue.data(null);
       } else {
@@ -111,12 +340,7 @@ class SmsCodeState {
   SmsCodeState({this.isSending = false, this.canSend = true, this.countdown = 0, this.error});
 
   SmsCodeState copyWith({bool? isSending, bool? canSend, int? countdown, String? error}) {
-    return SmsCodeState(
-      isSending: isSending ?? this.isSending,
-      canSend: canSend ?? this.canSend,
-      countdown: countdown ?? this.countdown,
-      error: error,
-    );
+    return SmsCodeState(isSending: isSending ?? this.isSending, canSend: canSend ?? this.canSend, countdown: countdown ?? this.countdown, error: error);
   }
 }
 
@@ -124,12 +348,7 @@ class SmsCodeState {
 class SmsCodeNotifier extends StateNotifier<SmsCodeState> {
   SmsCodeNotifier() : super(SmsCodeState());
 
-  final Dio _dio = Dio(
-    BaseOptions(
-      connectTimeout: const Duration(seconds: 5),
-      receiveTimeout: const Duration(seconds: 3),
-    ),
-  );
+  final Dio _dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 5), receiveTimeout: const Duration(seconds: 3)));
 
   /// 发送验证码
   Future<void> sendCode(String phone) async {
@@ -195,12 +414,7 @@ class SmsCodeNotifier extends StateNotifier<SmsCodeState> {
 class SmsLoginNotifier extends StateNotifier<AsyncValue<void>> {
   SmsLoginNotifier() : super(const AsyncValue.data(null));
 
-  final Dio _dio = Dio(
-    BaseOptions(
-      connectTimeout: const Duration(seconds: 5),
-      receiveTimeout: const Duration(seconds: 3),
-    ),
-  );
+  final Dio _dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 5), receiveTimeout: const Duration(seconds: 3)));
 
   /// 验证码登录
   Future<void> loginWithSms(String phone, String code) async {
@@ -211,9 +425,14 @@ class SmsLoginNotifier extends StateNotifier<AsyncValue<void>> {
         // 开发模式：模拟登录成功
         await Future.delayed(const Duration(seconds: 1));
         final prefs = await SharedPreferences.getInstance();
+        final isOldUser = await hasLocalUserByPhone(phone);
+        final userId = await ensureUserId(phone: phone);
         await prefs.setString(_kUserAccount, phone);
         await prefs.setBool(_kIsLoggedIn, true);
         await prefs.setString(_kUserToken, 'dev-bypass-token-sms');
+        await writeIsNewUser(userId, !isOldUser);
+        final completed = await readProfileCompleted(userId: userId);
+        await writeProfileCompleted(userId, isOldUser ? completed : false);
         state = const AsyncValue.data(null);
         return;
       }
@@ -224,9 +443,25 @@ class SmsLoginNotifier extends StateNotifier<AsyncValue<void>> {
 
       if (response.statusCode == 200 && response.data['code'] == 0) {
         final prefs = await SharedPreferences.getInstance();
+        final serverUserId = response.data['data']?['userId']?.toString() ?? response.data['userId']?.toString();
+        final userId = await ensureUserId(preferredId: serverUserId, phone: phone);
         await prefs.setString(_kUserAccount, phone);
         await prefs.setBool(_kIsLoggedIn, true);
         await prefs.setString(_kUserToken, response.data['token'] ?? '');
+
+        // 读取后端返回的新用户标记
+        final dynamic isNewUserRaw = response.data['data']?['isNewUser'] ?? response.data['isNewUser'];
+        final bool isNewUser = isNewUserRaw is bool ? isNewUserRaw : false;
+        await writeIsNewUser(userId, isNewUser);
+
+        // 读取资料完善状态
+        final dynamic profileCompletedRaw = response.data['data']?['profileCompleted'] ?? response.data['profileCompleted'];
+        if (profileCompletedRaw is bool) {
+          await writeProfileCompleted(userId, profileCompletedRaw);
+        } else {
+          final completed = await readProfileCompleted(userId: userId);
+          await writeProfileCompleted(userId, completed);
+        }
         state = const AsyncValue.data(null);
       } else {
         throw response.data['message'] ?? '验证码错误或已过期';
@@ -247,12 +482,7 @@ class SmsLoginNotifier extends StateNotifier<AsyncValue<void>> {
 class SmsRegisterNotifier extends StateNotifier<AsyncValue<void>> {
   SmsRegisterNotifier() : super(const AsyncValue.data(null));
 
-  final Dio _dio = Dio(
-    BaseOptions(
-      connectTimeout: const Duration(seconds: 5),
-      receiveTimeout: const Duration(seconds: 3),
-    ),
-  );
+  final Dio _dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 5), receiveTimeout: const Duration(seconds: 3)));
 
   /// 手机号验证码注册
   /// 参数：phone - 手机号，code - 验证码，password - 密码
@@ -264,26 +494,32 @@ class SmsRegisterNotifier extends StateNotifier<AsyncValue<void>> {
         // 开发模式：模拟注册成功
         await Future.delayed(const Duration(seconds: 1));
         final prefs = await SharedPreferences.getInstance();
+        final userId = await ensureUserId(phone: phone);
         await prefs.setString(_kUserAccount, phone);
+        await prefs.setString(_kUserId, userId);
         await prefs.setBool(_kIsLoggedIn, true);
         await prefs.setString(_kUserToken, 'dev-bypass-token-register');
+        await writeIsNewUser(userId, true); // 注册时设置为新用户
+        await writeProfileCompleted(userId, false);
         state = const AsyncValue.data(null);
         return;
       }
 
       // 调用后端注册 API：phone + code + password
       final String registerUrl = 'http://${LiveConfig.serverIP}:8000/api/v1/register';
-      final response = await _dio.post(registerUrl, data: {
-        'phone': phone,
-        'code': code,
-        'password': password,
-      });
+      final response = await _dio.post(registerUrl, data: {'phone': phone, 'code': code, 'password': password});
 
       if (response.statusCode == 200 && response.data['code'] == 0) {
         final prefs = await SharedPreferences.getInstance();
+        // 从后端响应获取用户ID，如果没有则生成一个
+        final serverUserId = response.data['data']?['userId']?.toString() ?? response.data['userId']?.toString();
+        final userId = await ensureUserId(preferredId: serverUserId, phone: phone);
         await prefs.setString(_kUserAccount, phone);
+        await prefs.setString(_kUserId, userId);
         await prefs.setBool(_kIsLoggedIn, true);
-        await prefs.setString(_kUserToken, response.data['token'] ?? '');
+        await prefs.setString(_kUserToken, response.data['token'] ?? response.data['data']?['token'] ?? '');
+        await writeIsNewUser(userId, true); // 注册时设置为新用户
+        await writeProfileCompleted(userId, false);
         state = const AsyncValue.data(null);
       } else {
         throw response.data['message'] ?? '注册失败，请检查验证码或手机号';

@@ -2,11 +2,20 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:video_live_stream/library.dart';
+import 'package:video_live_stream/features/auth/auth_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  if (await readIsLoggedIn()) {
-    Approute.initialLocation = '/';
+  final isLoggedIn = await readIsLoggedIn();
+  if (!isLoggedIn) {
+    Approute.initialLocation = '/Login';
+  } else {
+    final userId = await readUserId();
+    setInitialUserId(userId);
+    final isNewUser = await readIsNewUser(userId: userId);
+    final completed = await readProfileCompleted(userId: userId);
+    // 新用户或未完善资料的用户进入资料完善页，老用户直接进入首页
+    Approute.initialLocation = (isNewUser || !completed) ? '/Onboarding' : '/';
   }
   runApp(const ProviderScope(child: MyApp()));
 }

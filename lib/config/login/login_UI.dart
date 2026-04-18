@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:video_live_stream/config/login/login_provider.dart';
 import 'package:video_live_stream/config/toppop-up.dart';
+import 'package:video_live_stream/features/auth/auth_provider.dart';
 
 class Login extends ConsumerStatefulWidget {
   const Login({super.key});
@@ -65,7 +66,19 @@ class LoginState extends ConsumerState<Login> with SingleTickerProviderStateMixi
   Widget build(BuildContext context) {
     final loginState = ref.watch(loginProvider);
     ref.listen<AsyncValue<void>>(loginProvider, (previous, next) {
-      next.whenOrNull(data: (_) => context.goNamed('Mylivestream'), error: (error, stackTrace) => ToastUtil.showRedError(context, '登陆失败', error.toString()));
+      next.whenOrNull(
+        data: (_) async {
+          final userId = await ensureUserId();
+          ref.read(currentUserIdProvider.notifier).state = userId;
+          await ref.read(userDataProvider(userId).notifier).loadUserData();
+          final isNewUser = await readIsNewUser(userId: userId);
+          final completed = await readProfileCompleted(userId: userId);
+          if (!context.mounted) return;
+          // 新用户或未完善资料的用户进入资料完善页，老用户直接进入首页
+          context.goNamed((isNewUser || !completed) ? 'Onboarding' : 'Mylivestream');
+        },
+        error: (error, stackTrace) => ToastUtil.showRedError(context, '登陆失败', error.toString()),
+      );
     });
 
     return Scaffold(

@@ -4,18 +4,50 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:video_live_stream/config/login/login_provider.dart';
+import 'package:video_live_stream/features/auth/auth_provider.dart';
 import 'package:video_live_stream/live_stream_My/mePage_UI/apply_Page.dart';
 import 'package:video_live_stream/live_stream_My/meProvider_data/meProvider.dart';
 import 'package:video_live_stream/tool/region.dart';
 
-class MyVideoPage extends ConsumerWidget {
+class MyVideoPage extends ConsumerStatefulWidget {
   const MyVideoPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MyVideoPage> createState() => _MyVideoPageState();
+}
+
+class _MyVideoPageState extends ConsumerState<MyVideoPage> {
+  String _localUid = '';
+
+  @override
+  void initState() {
+    super.initState();
+    // 延迟初始化，避免阻塞主线程
+    Future.delayed(const Duration(milliseconds: 100), _ensureProfileReady);
+  }
+
+  Future<void> _ensureProfileReady() async {
+    final uid = await ensureUserId();
+    if (!mounted) return;
+
+    ref.read(currentUserIdProvider.notifier).state = uid;
+    await ref.read(userDataProvider(uid).notifier).loadUserData();
+
+    if (!mounted) return;
+    setState(() {
+      _localUid = uid;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     // 使用 watch 监听用户信息
     final me = ref.watch(meProvider);
     final locationAsync = ref.watch(userLocationProvider);
+    final displayUid = me?.uid?.trim().isNotEmpty == true ? me!.uid!.trim() : _localUid;
+    final displayName = me?.name?.trim().isNotEmpty == true ? me!.name!.trim() : '未设置';
+
     return Scaffold(
       // backgroundColor: const Color.fromARGB(255, 255, 255, 255),
       appBar: AppBar(
@@ -36,12 +68,12 @@ class MyVideoPage extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text("昵称: ${me?.name ?? '未设置'}", style: TextStyle(fontSize: 15)), //昵称
-                    Text("UID: ${me?.uid ?? 'unknown'}", style: TextStyle(fontSize: 15)), //UID
+                    Text("昵称: $displayName", style: const TextStyle(fontSize: 15)), //昵称
+                    Text("UID: ${displayUid.isEmpty ? 'unknown' : displayUid}", style: const TextStyle(fontSize: 15)), //UID
                     locationAsync.when(
-                      data: (area) => Text('IP:$area', style: TextStyle(fontSize: 15)), //ip地址
-                      loading: () => Text('正在获取位置...', style: TextStyle(fontSize: 15)),
-                      error: (Object error, StackTrace stackTrace) => Text('获取位置失败', style: TextStyle(fontSize: 15)),
+                      data: (area) => Text('IP:$area', style: const TextStyle(fontSize: 15)), //ip地址
+                      loading: () => const Text('正在获取位置...', style: TextStyle(fontSize: 15)),
+                      error: (Object error, StackTrace stackTrace) => const Text('获取位置失败', style: TextStyle(fontSize: 15)),
                     ),
                   ],
                 ),
@@ -83,7 +115,13 @@ class MyVideoPage extends ConsumerWidget {
       );
     }
     if (path.startsWith('/')) {
-      return Image.file(File(path), width: 80, height: 80, fit: BoxFit.cover);
+      return Image.file(
+        File(path),
+        width: 80,
+        height: 80,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => Container(height: 80, width: 80, color: Colors.grey[300], child: const Icon(Icons.person)),
+      );
     }
     return Image.asset(
       path,
